@@ -26,3 +26,4 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 - The sceptic step pays for itself. Keep it.
 - A fresh verify pass over a report that had already been verified still found 4 wrong claims and flipped the option ranking, mostly by joining evidence from later runs. Worth doing before a report is circulated widely.
 
+- **Installers echo secrets.** A command echo printed an API key embedded in a URL into the transcript. Mask keys in anything a script prints (scripts/install.sh mask()).
