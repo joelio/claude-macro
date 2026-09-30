@@ -86,6 +86,8 @@ Stack-specific harnesses live in `packs/<name>/` with their own examples and les
 | verify (7 groups + 2 attacks, 123 claims) | 9 | 896k | 7.1 min |
 | change-evidence (3 checks + benchmark + Opus) | 5 | 321k | 12.1 min |
 | config-change verify (5 + Opus attack) | 6 | 528k | 9.1 min |
+| v0.2 verify, cluck docs (4 groups + Opus logic + 1 attack, 61 claims) | 6 | 511k | 5.8 min |
+| v0.2 investigate smoke (2 low streams + sceptic) | 3 | 168k | 0.8 min |
 
 These runs predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (estimate, not yet measured). Keep a run to 10 agents or fewer unless asked (the dry run enforces it), and scope each agent to one question.
 
