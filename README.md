@@ -1,84 +1,70 @@
 # macro
 
-Evidence-based engineering investigations with Claude Code workflows. Many Sonnet agents gather evidence in parallel, and every claim is tagged by how it is known and cited with a verbatim quote. A stronger model (Opus) then tries to break the result before you act on it.
+Claude Code workflows for engineering investigations that rest on evidence. You ask a question about a codebase, a bug, a change, a report or a choice; parallel agents gather cited evidence, and a stronger model then tries to break the answer before you act on it.
 
-It works on any codebase and question: a slow CLI, a flaky test, an ESP32 that won't reconnect, a Terraform provider upgrade, picking an identity provider, or "is this report right?".
+## Why it is different
 
-```
- question ──► investigate ──► decide / debug ──► change-evidence ──► verify the write-up
-              streams +       options or         checks + bench +    claim groups +
-              Opus sceptic    hypotheses +       Opus challenger     Opus logic + attackers
-                              Opus adversary
-```
+- **Parallel, cited evidence.** Several Sonnet agents each take one way of knowing: measure it, read the code, read the history, read the spec. Every claim is tagged `measured`, `code`, `sourced` or `inferred` and carries a citation with a verbatim quote. No quote, no "confirmed": the scripts demote uncited verdicts rather than trust them.
+- **Then an adversary.** Every run ends with an Opus agent whose only job is to break the result: a sceptic that re-checks findings by id, a logic reviewer, an attacker per recommendation, a change challenger or a debug adjudicator. It is held to the same standard: an objection without a citation becomes a question.
+- **Only what survives is quotable.** The adversary's `claims_safe_for_pr` sentences, each naming its evidence, are the only ones meant for a PR, commit or report summary.
 
 ## Quick start
 
 ```sh
-git clone git@github.com:joelio/claude-macro.git ~/src/claude-macro
-export EXA_API_KEY=...           # optional: lifts exa's free-tier rate limit
-~/src/claude-macro/scripts/install.sh
+git clone git@github.com:joelio/claude-macro.git
+cd claude-macro
+export EXA_API_KEY=...        # optional: lifts exa's free-tier rate limit; stored in your OS keychain
+export CONTEXT7_API_KEY=...   # optional
+scripts/install.sh
 ```
 
-Restart Claude Code. Then, in any repo, say **"macro it: <your question>"**. For a cheap first run that checks the install, say "macro it: run the smoke example". That runs `examples/investigate-smoke.json`: 3 agents at low effort.
+Restart Claude Code. Then, in any repo, say **"macro it: run the smoke example"**. That runs `examples/investigate-smoke.json`: 3 agents at low effort, about 170k tokens and under a minute. When it works, ask a real question: **"macro it: <your question>"**.
 
-Needs Claude Code, Node 18+ and git. The installer is safe to re-run. It:
+The installer needs Claude Code, Node 18 or later and git. It links the skill, adds the `exa` and `context7` MCP servers at user scope, and runs the tests. It is safe to re-run; `--check` reports without changing anything. See [Getting started](docs/guide/getting-started.md).
 
-- links the skill;
-- adds the **exa** MCP server (search, fetch, code context) and **context7** (library docs) at user scope;
-- runs the tests.
+## The five workflows
 
-Existing MCP servers are left alone unless you pass `--update-mcp`. Use `--check` to see what is missing, and `--pack web-perf` to add a pack's harness.
-
-## Workflows
-
-| Workflow | For | Shape | Agents |
+| Workflow | Use it when | Shape | Agents |
 |---|---|---|---|
-| `investigate` | Understanding a problem or ticket | 4-6 evidence streams, then an Opus sceptic. The sceptic re-checks every finding the decision rests on, marks the rest `not-checked`, and names unanswered questions and alternative explanations | 5-7 |
-| `verify` | A report, README, PR or claim set | Claim groups with quote-required verdicts, then an Opus logic review and one attacker per recommendation. Adversaries get the verdicts in a slim form | 4-10 |
-| `change-evidence` | A committed change | Parallel checks and an optional clean benchmark (`process`, `browser`, `device`, `gpu`), then an Opus challenger that writes the claims safe to quote and the verification steps | 3-6 |
-| `debug` | A bug, crash, flaky test or regression | Reproduction plus competing hypotheses, parallel attempts to falsify each (serialised on a shared device), then an Opus adjudicator with a cited cause-to-symptom chain and a regression test | 4-8 |
-| `decide` | Choosing between options, or an upgrade | Evidence per option against fixed criteria (`kind: upgrade` adds breaking-change, advisory and build-in-a-clone checks), then an Opus attack on the leader and a ranking | 3-7 |
+| `investigate` | You need to understand a problem or ticket before deciding anything | 4-6 evidence streams, then an Opus sceptic that re-checks findings by id and names gaps and alternatives | streams + 1 |
+| `verify` | A report, README, PR or set of claims is about to go to other people | Claim groups with quote-required verdicts, then an Opus logic review and one attacker per recommendation | groups + 1 + attacks |
+| `change-evidence` | A change is committed locally and needs proof before or alongside a draft PR | Parallel checks, an optional clean benchmark, then an Opus challenger that writes the safe claims and verification steps | checks + benchmark + 1 |
+| `debug` | A bug, crash, flaky test or regression whose cause is not known | Reproduce plus competing hypotheses, parallel attempts to falsify each, then an Opus adjudicator with a cited cause-to-symptom chain | 2 + hypotheses + 1 |
+| `decide` | A choice between options, or a dependency upgrade | Evidence per option against fixed criteria, then an Opus attack on the leader and a ranking | options + shared + 1 |
 
-Each workflow's `args` are documented at the top of its script; `examples/` has one or more per workflow. Results go to a run folder under `~/.local/share/macro/<project>/`, with a `REPORT.md` from `docs/report-template.md` and an entry in `~/.local/share/macro/INDEX.md`.
+Chains are normal: investigate, then decide or debug, then change-evidence for the fix, then verify the write-up. Each is described in [Workflows](docs/guide/workflows.md).
 
-## Rules the agents follow
+## What a run gives you
 
-- **Evidence tags.** Every claim is `measured`, `code`, `sourced` or `inferred`. A tag that overstates certainty is a defect.
-- **Citations.** Claims carry `{source, quote, via}`. No quote, no "confirmed": the scripts demote an uncited confirmed verdict to unverifiable, and an uncited upheld or refuted verdict to untestable. Workers may leave citations empty rather than invent a quote. `via` records whether context7, exa, WebFetch or curl found it.
-- **Sources.** context7 for library behaviour, exa to find specs and vendor docs, `web_fetch_exa` for the exact text quoted, and curl when a tool is rate-limited.
-- **Numbers.** Method, n, median with IQR or min-max, and the unit.
-- **Safety.** Read-only against live systems with light traffic. Agents never edit, stash, reset or commit in the repo under study; code changes happen in disposable clones under the run folder.
-- **Adversary last, and held to the same standard.** An uncited blocker or serious objection is demoted to a question. Only `claims_safe_for_pr` sentences, each naming its evidence, go to other people.
-- **Cost tiers.** Sonnet at `low` effort for mechanical work and `medium` for evidence; Opus at `high` only for the adversary. Effort is always explicit (an omitted one inherits the session's), and adversary prompts carry compact JSON. For a hard or high-stakes question, set `"profile": "deep"` (workers high, adversary xhigh) or `"max"` (workers high, adversary max); `"quick"` suits smoke tests. Per-task `effort` still overrides the profile. Override models in `args` if needed, but never make the adversary weaker than the workers.
+Everything lands in a run folder, `~/.local/share/macro/<project>/<YYYY-MM-DD>-<slug>/`, outside any repo:
 
-## Self-improvement loop
-
-`scripts/improve.sh [n]` runs a bounded, Ralph-style loop on this repo, n iterations (3 by default):
-
-1. Each iteration is a fresh headless Sonnet run in `dontAsk` mode with a narrow tool list; git cannot push. It takes the top item in `improve/BACKLOG.md`, does at most 5 context7 or exa lookups, makes the change, passes `npm test` and commits on an `improve/*` branch.
-2. The checks are re-run from a pristine copy taken at start, and commits that touch the loop's own gates (`scripts/`, `tests/`, `package.json`, the improve prompts) are refused, so a worker can't loosen what judges it. An Opus run then reviews the commit and keeps or reverts it. A reverted or refused item is blocked with the reason.
-3. `MAX_USD_PER_RUN` (3 by default) caps each headless run's spend.
-
-It never pushes; review with `git log -p main..HEAD`.
-
-`scripts/improve.sh --retro` runs one Opus retro over your real runs: `~/.local/share/macro/INDEX.md`, each run's `did-it-help.md`, and the token numbers. It adds lessons and backlog items only for patterns seen across runs, each citing the runs that show it. It may change only `LESSONS.md`, the backlog and the changelog.
-
-In this repo, a project hook (`.claude/settings.json`) runs the checks after every edit to a workflow, example or test, and blocks with the failure until it is fixed.
-
-`npm test` is the loop's pass/fail check, and it costs no tokens:
-
-- `scripts/check-workflows.mjs` statically checks each workflow: pure meta, both-way phase match, Opus last, the evidence-tag enum, `{source, quote, via}` citations, the identical shared prelude, effort on every agent, no indented JSON in prompts, and harness syntax.
-- `tests/dry-run.mjs` runs every workflow against every example with a stubbed `agent()`, three times: full output, sparse output, and with each agent in turn returning null. It also unit-checks `demote()`. `--estimate <args.json> <workflow>` shows a real run's agents and tiers before you spend tokens.
-
-## Packs
-
-Stack-specific harnesses live in `packs/<name>/` with their own examples and lessons. They are installed only on request.
-
-| Pack | What |
+| File | What |
 |---|---|
-| `packs/web-perf/` | Playwright and CDP profiling, an A/B import benchmark, an nginx header test in Docker, and a load-balancer log query |
+| `args.json` | The arguments the run used, so you can re-run or adjust it |
+| `result.json` | The workflow's full return value, with the run id, transcript directory and wall time added |
+| `REPORT.md` | The report, from `docs/report-template.md`: answer, deciding evidence with citations and re-check verdicts, what the adversary changed, what is not established, next steps, safe-to-quote sentences, method |
+| `did-it-help.md` | Four headings for you to fill in within a day; the retro reads it |
+| `<stream>/` | Raw data, saved sources and scripts from each agent |
+| `UAT.md` | After `change-evidence`, the results of walking through the verification steps |
 
-## Cost seen in practice
+`~/.local/share/macro/INDEX.md` gets one line per run: date, project, workflow, question, verdict and path. Later runs on the same project feed those lines back in.
+
+A real example: a `verify` run over a Rust CLI's README and getting-started guide returned 61 claims (43 confirmed, 14 partly, 4 unverifiable, none wrong) and found that the guide did not work end to end, because it never said to install the CLI it depends on. Six agents, 511k tokens, 5.8 minutes. A blind `debug` run, given only the symptom of a bug whose fix was hidden, named the real root cause and most of a second, contributing one.
+
+## Cost and effort
+
+Models and effort are tiered. Sonnet does the evidence work (`low` for mechanical tasks such as counts and builds, `medium` otherwise); Opus at `high` judges. `"profile"` in `args` shifts the whole run:
+
+| Profile | Workers | Adversary | For |
+|---|---|---|---|
+| `quick` | `low` | `medium` | Smoke tests |
+| `standard` (default) | `medium` | `high` | Most runs |
+| `deep` | `high` | `xhigh` | Hard questions |
+| `max` | `high` | `max` | High stakes |
+
+An effort set on a single stream, group, check or attack overrides the profile. Before any run, `node tests/dry-run.mjs --estimate <args.json> <workflow>` lists the agents and tiers at no token cost.
+
+Cost seen in practice:
 
 | Run | Agents | Subagent tokens | Wall time |
 |---|---|---|---|
@@ -88,20 +74,29 @@ Stack-specific harnesses live in `packs/<name>/` with their own examples and les
 | config-change verify (5 + Opus attack) | 6 | 528k | 9.1 min |
 | v0.2 verify, cluck docs (4 groups + Opus logic + 1 attack, 61 claims) | 6 | 511k | 5.8 min |
 | v0.2 investigate smoke (2 low streams + sceptic) | 3 | 168k | 0.8 min |
+| v0.2 debug, blind test of a known bug (reproduce + 5 hypotheses + Opus) | 8 | 543k | 11.3 min |
 
-These runs predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (estimate, not yet measured). Keep a run to 10 agents or fewer unless asked (the dry run enforces it), and scope each agent to one question.
+The first four rows predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (an estimate, not yet measured). Runs stay at 10 agents or fewer unless you ask for more; the dry run enforces the limit.
+
+## Guides
+
+- [Getting started](docs/guide/getting-started.md): install, keys, `--check`, packs, a smoke run, a first real run, reading the report.
+- [Workflows](docs/guide/workflows.md): each workflow's stages, args, a real example and what comes back.
+- [Running well](docs/guide/running-well.md): scoping, effort profiles, estimates, lessons via `tools`, safety rules, chaining.
+- [Improving](docs/guide/improving.md): `did-it-help.md`, the retro, the self-improvement loop, packs.
+- [Troubleshooting](docs/guide/troubleshooting.md): the problems we hit and their fixes.
+
+Method notes: [citations](docs/citations.md), [adversarial review](docs/adversarial.md), the [report template](docs/report-template.md) and [LESSONS.md](LESSONS.md). Maintainer notes are in `CLAUDE.md`; versions in `CHANGELOG.md`.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| `workflows/` | The five workflow scripts |
+| `workflows/` | The five workflow scripts; each documents its `args` in a header comment |
 | `examples/` | Example `args`, named `<workflow>-*.json` |
-| `skills/macro/` | The trigger skill (linked by the installer) |
-| `docs/` | Citation method, adversarial method, report template |
-| `packs/` | Optional stack-specific harnesses |
-| `improve/` | Self-improvement prompt, review prompt and backlog |
-| `scripts/` | `install.sh`, `improve.sh`, `check-workflows.mjs` |
-| `tests/dry-run.mjs` | Zero-token end-to-end run of every workflow and example |
-| `LESSONS.md` | General traps and how the agents did |
-| `CHANGELOG.md` | Versions |
+| `skills/macro/` | The trigger skill, linked by the installer |
+| `docs/` | Method notes, the report template and these guides |
+| `packs/` | Optional stack-specific harnesses (`web-perf`) |
+| `improve/` | The self-improvement prompts and backlog |
+| `scripts/` | `install.sh`, `improve.sh`, `exa-headers.sh`, `check-workflows.mjs` |
+| `tests/dry-run.mjs` | Zero-token run of every workflow and example, and `--estimate` |

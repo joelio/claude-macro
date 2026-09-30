@@ -14,7 +14,7 @@ export const meta = {
 //   context: 'why, what is measured already, paths',
 //   workDir: '/abs/dir for scripts and raw data (outside any repo)',
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools, appended to the defaults',
-//   checks: [{ key, prompt, effort? }],               // effort defaults to 'medium'; 'low' for mechanical checks
+//   checks: [{ key, prompt, effort? }],               // effort defaults to the profile's worker effort; 'low' for mechanical checks
 //   benchmark?: { prompt, kind?, effort? },           // kind: 'process' (default) | 'browser' | 'device' | 'gpu'; omit when timing is not the question
 //   qaAudience?: 'who verifies and with what',        // default: the developer, locally
 //   workerModel?: 'sonnet', reviewModel?: 'opus', reviewEffort?: 'high'

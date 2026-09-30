@@ -11,7 +11,7 @@
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd); SKILL=macro
 CHECK=0; UPDATE=0; PACKS=()
-while [ $# -gt 0 ]; do case $1 in --check) CHECK=1;; --update-mcp) UPDATE=1;; --pack) PACKS+=("${2:?--pack needs a name}"); shift;; --no-harness) ;; *) echo "unknown option $1"; exit 2;; esac; shift; done
+while [ $# -gt 0 ]; do case $1 in --check) CHECK=1;; --update-mcp) UPDATE=1;; --pack) PACKS+=("${2:?--pack needs a name}"); shift;; *) echo "unknown option $1"; exit 2;; esac; shift; done
 EXA_TOOLS=web_search_exa,web_fetch_exa,get_code_context_exa,crawling_exa
 ok() { echo "  ok    $*"; }; todo() { echo "  todo  $*"; missing=1; }; missing=0
 # Never print secrets: mask API keys in URLs and header values when echoing commands.

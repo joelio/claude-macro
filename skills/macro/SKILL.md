@@ -44,7 +44,7 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 
 ## After a run
 
-1. Write the full return value to `<workDir>/result.json`, with the run id, the transcript directory and the wall time added. Then write `<workDir>/REPORT.md` from `<repo>/docs/report-template.md`; the return value's `spent` field gives output tokens at each phase boundary. Read the journal if the summary is truncated.
+1. Write the full return value to `<workDir>/result.json`, with the run id, the transcript directory and the wall time added. Then write `<workDir>/REPORT.md` from `<repo>/docs/report-template.md`; the return value's `spent` field is cumulative output tokens (for the whole orchestrator turn) at each phase boundary, so report the differences between marks. Read the journal if the summary is truncated.
 2. Check the adversary's own claims against the measured evidence and fix anything it got wrong; say so in the report. Spot-check five quotes: grep each against its source and record how many were found in the report's Method section.
 3. Append one line to `~/.local/share/macro/INDEX.md`: date, project, workflow, question, verdict, path. Give the user the report path. Every few runs, suggest `<repo>/scripts/improve.sh --retro` so the lessons from real runs reach the backlog.
 4. Offer a cross-model second opinion if `owl` is installed and the user agrees (it calls external models): `owl ask -f <workDir>/REPORT.md --format standard > <workDir>/second-opinion.md`, with the report prefixed by "List claims in this report you believe are false, each with a reason, and nothing else." Put the disagreements under "Not established".
