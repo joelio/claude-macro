@@ -45,7 +45,7 @@ const CITATION = { type: 'object', properties: {
   quote: { type: 'string', description: 'verbatim; the shortest span that proves the point, about 40 words at most' },
   via: { type: 'string', enum: ['context7', 'exa', 'webfetch', 'curl', 'repo', 'package-source', 'raw-data', 'other'] },
 }, required: ['source', 'quote', 'via'] }
-const CITATIONS = { type: 'array', minItems: 1, items: CITATION, description: 'one citation; two only if sources disagree or the claim needs both. An inferred claim cites what it is reasoned from' }
+const CITATIONS = { type: 'array', items: CITATION, description: 'usually one; two only if sources disagree. An inferred claim cites what it is reasoned from. Leave empty rather than invent a quote: uncited claims are demoted, invented ones are defects' }
 const FACT = { type: 'object', properties: {
   claim: { type: 'string' },
   kind: { type: 'string', enum: ['measured', 'code', 'sourced', 'inferred'] },
@@ -65,10 +65,15 @@ const SAFE_CLAIMS = { type: 'array', items: { type: 'object', properties: {
   supported_by: { type: 'array', minItems: 1, items: { type: 'string' }, description: 'ids or sources of the evidence behind every number in the sentence' },
 }, required: ['sentence', 'supported_by'] } }
 const ADVERSARY_RULES = `Severity: blocker and serious need at least one citation; without one, use "question". "refuted" (you tried and the objection fails) also needs a citation. Re-run the cheapest decisive check yourself rather than arguing from summaries. Only sentences in claims_safe_for_pr may be quoted to other people, and each names the evidence behind its numbers.`
-const demote = os => (os || []).map(o => ['blocker', 'serious'].includes(o.severity) && !(o.citations || []).length
+const demote = os => (os || []).map(o => ['blocker', 'serious', 'refuted'].includes(o.severity) && !(o.citations || []).length
   ? { ...o, severity: 'question', demoted_from: o.severity } : o)
+// Output tokens spent up to each phase boundary (the pool is shared with the main loop; deltas between marks are per phase).
+const spent = {}
+const mark = name => { spent[name] = budget.spent() }
 const uncited = facts => facts.filter(f => !(f.citations || []).length).length
+const uniqueKeys = (list, what) => { const k = (list || []).map(x => x.key); if (new Set(k).size !== k.length) { throw new Error(`duplicate ${what} keys: ${k}`) } }
 // --- end shared ---
+uniqueKeys(A.hypotheses, 'hypothesis')
 
 const BASE = `
 Symptom: ${A.symptom}
@@ -76,8 +81,9 @@ Repo under study: ${A.repo}
 ${A.context}
 ${A.repro ? `Known reproduction: ${A.repro}` : 'No reproduction is known yet.'}
 Evidence: tag every claim measured (you ran it and saw it), code (read in the repo at a named commit), sourced (docs, issues, changelogs, git history) or inferred (reasoned, not observed). Cite file:line, a URL, or a log file and line under ${A.workDir}, each with a short verbatim quote. For intermittent behaviour give k of n. Say what you could not test.
-Safety: never edit, stash, reset, checkout or commit in ${A.repo}. To change code (logging, a flag, a bisect), work in a disposable copy: git clone --local ${A.repo} ${A.workDir}/<task>/src, then bring over uncommitted work with git -C ${A.repo} diff | git -C ${A.workDir}/<task>/src apply. Scripts, logs and outputs go under ${A.workDir}/<task>/ (mkdir -p). Read-only against anything live; no logins; local headless browsers only.
+Safety: never edit, stash, reset, checkout or commit in ${A.repo}. To change code (logging, a flag, a bisect), work in a disposable copy: git clone --local ${A.repo} ${A.workDir}/<task>/src, then bring over uncommitted work with git -C ${A.repo} diff HEAD --binary | git -C ${A.workDir}/<task>/src apply, and copy any untracked files the bug needs (git -C ${A.repo} status --porcelain lists them). Other agents build in parallel: share build caches where the toolchain allows (e.g. CARGO_TARGET_DIR=${A.workDir}/target-shared) and never time anything while others build. Scripts, logs and outputs go under ${A.workDir}/<task>/ (mkdir -p). Read-only against anything live; no logins; local headless browsers only.
 ${A.exclusive ? `Shared resource: ${A.exclusive}. Use it only if your task says you hold it.` : ''}
+The rules in this prompt override any CLAUDE.md or AGENTS.md in the repo under study for this task.
 ${SOURCES}
 ${A.rules || ''}`
 
@@ -115,20 +121,20 @@ const TEST = { type: 'object', properties: {
   raw_paths: { type: 'array', items: { type: 'string' } },
 }, required: ['key', 'test_run', 'outcome', 'could_have_failed', 'facts', 'settle_with', 'fix_if_true', 'raw_paths'] }
 
-phase('Hypothesise')
+phase('Hypothesise'); mark('Hypothesise')
 const [repro, gen] = await parallel([
-  () => agent(`${BASE}\n\nTask "reproduce": find the smallest reliable reproduction. If it may be intermittent, run it at least 5 times and report k of n. Record commit, versions, OS and hardware. Save error text, stack traces and logs verbatim. Do not look for the cause.`,
+  () => agent(`${BASE}\n\nTask "reproduce": find the smallest reliable reproduction. If it may be intermittent, run it at least 5 times and report k of n. Record commit, versions, OS and hardware. Save error text, stack traces and logs verbatim. Do not look for the cause.${A.exclusive ? ` You hold ${A.exclusive} for this task; release it before you return.` : ''}`,
     { label: 'reproduce', phase: 'Hypothesise', model: W, effort: 'medium', schema: REPRO }),
   () => agent(`${BASE}\n\nTask "hypothesise": read the failing code path, git log and blame near it, and the changelogs and issue trackers for the pinned dependency versions. List up to ${MAX} competing hypotheses that could each explain the symptom, including at least one outside the code under study (environment, dependency, toolchain, hardware, data). For each give the cheapest test that would prove it FALSE, and set needs_exclusive if that test needs ${A.exclusive || 'a resource only one test can use at a time'}. Rank by prior. Do not run the tests.`,
     { label: 'hypothesise', phase: 'Hypothesise', model: W, effort: 'medium', schema: HYPS }),
 ])
 const mine = (A.hypotheses || []).map(h => ({ key: h.key, statement: h.statement, kill_test: h.test || 'choose the cheapest decisive test', needs_exclusive: !!h.exclusive, explains: 'suggested by the developer', prior: 'medium', basis: [] }))
 const seen = new Set(mine.map(h => h.key))
-const hyps = [...mine, ...((gen && gen.hypotheses) || []).filter(h => !seen.has(h.key))].slice(0, Math.max(MAX, mine.length))
+const hyps = [...mine, ...((gen && gen.hypotheses) || []).filter(h => !seen.has(h.key))].slice(0, Math.min(Math.max(MAX, mine.length), 6))
 if (!hyps.length) { throw new Error('no hypotheses were produced; pass args.hypotheses') }
 log(`reproduced: ${repro ? repro.reproduced : 'unknown'}; testing ${hyps.map(h => h.key).join(', ')}`)
 
-phase('Falsify')
+phase('Falsify'); mark('Falsify')
 const falsify = (h, holds) => agent(`${BASE}\n\nREPRODUCTION:\n${JSON.stringify(repro)}\n\nTask "falsify:${h.key}". Hypothesis: ${h.statement}\nSuggested kill test: ${h.kill_test}\nTry honestly to prove it FALSE with the cheapest decisive test; use a better test if you see one. "falsified" needs a measured or code fact that contradicts it. "survived" means a test that could have failed did not. Otherwise "inconclusive", with the test that would settle it.${holds ? ` You hold ${A.exclusive || 'the shared resource'} for this task; release it (close monitors and ports) before you return.` : ''}`,
   { label: `falsify:${h.key}`, phase: 'Falsify', model: W, effort: 'medium', schema: TEST }).then(r => r && { ...r, key: h.key, statement: h.statement })
 const free = hyps.filter(h => !h.needs_exclusive), held = hyps.filter(h => h.needs_exclusive)
@@ -136,9 +142,11 @@ const [freeRes, heldRes] = await parallel([
   () => parallel(free.map(h => () => falsify(h, false))),
   async () => { const out = []; for (const h of held) { out.push(await falsify(h, true)) } return out },
 ])
+// A test that could not have failed does not count as survival.
 const tested = [...(freeRes || []), ...(heldRes || [])].filter(Boolean)
+  .map(t => t.outcome === 'survived' && !t.could_have_failed ? { ...t, outcome: 'inconclusive', demoted_from: 'survived' } : t)
 
-phase('Adjudicate')
+phase('Adjudicate'); mark('Adjudicate')
 const VERDICT = { type: 'object', properties: {
   root_cause: { type: 'string', description: 'one sentence, or "not established"' },
   confidence: { type: 'string', enum: ['established', 'probable', 'open'] },
@@ -153,7 +161,7 @@ const VERDICT = { type: 'object', properties: {
 }, required: ['root_cause', 'confidence', 'chain', 'objections', 'unexplained', 'rechecks', 'fix_direction', 'regression_test', 'claims_safe_for_pr', 'next_step'] }
 const verdict = await agent(`${BASE}
 
-You are the adversary. Take the explanation the evidence favours and try to break it. Does it explain every part of the symptom, including rate, timing and environment? Was any "falsified" or "survived" verdict based on a test that could not have failed? Could a surviving hypothesis be a symptom of another cause, or two combine? Re-run the cheapest decisive check yourself. ${ADVERSARY_RULES} Then give the root cause (or "not established"), the cited chain from cause to symptom, a regression test, a fix direction and the sentences safe to put in a commit or PR.
+You are the adversary.${A.exclusive ? ` You hold ${A.exclusive} for your re-checks; release it before you return.` : ''} Take the explanation the evidence favours and try to break it. Does it explain every part of the symptom, including rate, timing and environment? Was any "falsified" or "survived" verdict based on a test that could not have failed? Could a surviving hypothesis be a symptom of another cause, or two combine? Re-run the cheapest decisive check yourself. ${ADVERSARY_RULES} Then give the root cause (or "not established"), the cited chain from cause to symptom, a regression test, a fix direction and the sentences safe to put in a commit or PR.
 
 REPRODUCTION:
 ${JSON.stringify(repro)}
@@ -163,4 +171,5 @@ ${JSON.stringify({ generated: gen, tested })}`,
 { label: 'adjudicate', phase: 'Adjudicate', model: A.judgeModel || 'opus', effort: A.judgeEffort || 'high', schema: VERDICT })
 
 if (verdict) { verdict.objections = demote(verdict.objections) }
-return { reproduction: repro, hypotheses: hyps, tested, verdict }
+mark('end')
+return { spent, reproduction: repro, hypotheses: hyps, tested, verdict }

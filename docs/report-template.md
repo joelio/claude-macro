@@ -10,7 +10,7 @@
 
 | # | Claim | Tag | Citation (source — "quote") | Re-checked |
 |---|---|---|---|---|
-| 1 | | measured / code / sourced / inferred | | upheld / weakened / refuted / not-checked |
+| 1 | | measured / code / sourced / inferred | | upheld / weakened / refuted / untestable / not-checked |
 
 ## What the adversary changed
 

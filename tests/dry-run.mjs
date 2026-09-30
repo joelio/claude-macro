@@ -1,7 +1,13 @@
-// Runs every workflow end to end against every example args file, with a stubbed agent() that returns
-// schema-valid fake output. Catches runtime errors, undefined or [object Object] in prompts, agent calls
-// without a model, effort or schema, and a last call that is not the adversary. Costs no tokens.
-// Examples are matched to workflows by file name: examples/<workflow>-*.json and packs/*/examples/<workflow>-*.json.
+// Runs every workflow end to end against every example args file with a stubbed agent(), at no token cost.
+// Three passes per example:
+//   full   - every schema field filled, first enum value, one item per array;
+//   sparse - empty arrays where the schema allows, enum values varied by call;
+//   null   - each agent in turn returns null (as when it fails or is skipped).
+// Fails on a thrown error, undefined or [object Object] in a prompt, an agent without model, effort or schema,
+// more than 10 agents, or (full pass) a last agent that is not the adversary on opus.
+// Examples are matched by file name: examples/<workflow>-*.json and packs/*/examples/<workflow>-*.json.
+//
+// Estimate a real run before spending tokens:  node tests/dry-run.mjs --estimate <args.json> <workflow>
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,47 +16,83 @@ const workflows = fs.readdirSync(path.join(root, 'workflows')).filter(f => f.end
 const exampleDirs = [path.join(root, 'examples'), ...fs.readdirSync(path.join(root, 'packs'), { withFileTypes: true })
   .filter(d => d.isDirectory()).map(d => path.join(root, 'packs', d.name, 'examples'))].filter(d => fs.existsSync(d));
 const examples = exampleDirs.flatMap(d => fs.readdirSync(d).filter(f => f.endsWith('.json')).map(f => path.join(d, f)));
+const readArgs = f => JSON.parse(fs.readFileSync(f, 'utf8').replace(/"<([A-Z_]+)>/g, (_, k) => `"/${k.toLowerCase()}`));
 
-function fake(s, key = 'x') {
+function fake(s, mode, n, key = 'x') {
   if (!s) return 'x';
-  if (s.enum) return s.enum[0];
+  if (s.enum) return mode === 'sparse' ? s.enum[n % s.enum.length] : s.enum[0];
   switch (s.type) {
-    case 'object': return Object.fromEntries(Object.entries(s.properties || {}).map(([k, v]) => [k, fake(v, k)]));
-    case 'array': return Array.from({ length: Math.max(1, s.minItems || 0) }, (_, i) => fake(s.items, `${key}${i}`));
-    case 'boolean': return true;
+    case 'object': return Object.fromEntries(Object.entries(s.properties || {}).map(([k, v]) => [k, fake(v, mode, n, k)]));
+    case 'array': return Array.from({ length: mode === 'sparse' ? (s.minItems || 0) : Math.max(1, s.minItems || 0) }, (_, i) => fake(s.items, mode, n + i, `${key}${i}`));
+    case 'boolean': return mode !== 'sparse';
     case 'number': case 'integer': return 1;
     default: return `${key}-value`;
   }
 }
 
+async function runOnce(w, args, mode, nullAt = -1) {
+  const src = fs.readFileSync(path.join(root, 'workflows', `${w}.js`), 'utf8');
+  const calls = [], problems = [];
+  const agent = async (prompt, o = {}) => {
+    const n = calls.length; calls.push(o);
+    const m = /undefined|\[object Object\]/.exec(prompt);
+    if (m) problems.push(`${o.label}: prompt contains ${m[0]}`);
+    if (!o.model || !o.effort || !o.schema) problems.push(`${o.label}: missing ${['model', 'effort', 'schema'].filter(k => !o[k]).join(', ')}`);
+    return n === nullAt ? null : fake(o.schema, mode, n);
+  };
+  const parallel = async thunks => Promise.all(thunks.map(t => Promise.resolve().then(t).catch(e => { problems.push(`thunk threw: ${e.message}`); return null; })));
+  const pipeline = async (items, ...stages) => Promise.all(items.map(async (it, i) => { let r = it; for (const s of stages) r = await s(r, it, i); return r; }));
+  const budget = { total: null, spent: () => calls.length * 1000, remaining: () => Infinity };
+  const run = new (Object.getPrototypeOf(async () => {}).constructor)('args', 'agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'workflow',
+    src.replace(/^export const meta/m, 'const meta'));
+  let out;
+  try { out = await run(args, agent, parallel, pipeline, () => {}, () => {}, budget, async () => null); } catch (e) { problems.push(`threw: ${e.message}`); }
+  if (!problems.length && !out) problems.push('returned nothing');
+  if (calls.length > 10) problems.push(`${calls.length} agents; the limit is 10 unless the user asks`);
+  return { calls, problems, out };
+}
+
+// Unit check on the shared demote(): uncited blocker, serious and refuted become questions; cited ones stay.
+{
+  const src = fs.readFileSync(path.join(root, 'workflows', `${workflows[0]}.js`), 'utf8');
+  const shared = src.match(/\/\/ --- shared:[\s\S]*?\/\/ --- end shared ---/)[0];
+  const demote = new Function('A', 'budget', `${shared}\nreturn demote`)({}, { spent: () => 0 });
+  const out = demote([{ severity: 'blocker', citations: [] }, { severity: 'refuted' }, { severity: 'serious', citations: [{}] }, { severity: 'minor', citations: [] }]);
+  const want = ['question', 'question', 'serious', 'minor'];
+  if (out.map(o => o.severity).join() !== want.join()) { console.log(`FAIL demote(): got ${out.map(o => o.severity)}, want ${want}`); process.exitCode = 1; }
+  else console.log('ok   demote() unit check');
+}
+
+if (process.argv[2] === '--estimate') {
+  const [file, w] = process.argv.slice(3);
+  if (!file || !workflows.includes(w)) { console.error(`usage: node tests/dry-run.mjs --estimate <args.json> <${workflows.join('|')}>`); process.exit(2); }
+  const { calls, problems } = await runOnce(w, readArgs(file), 'full');
+  const tiers = calls.reduce((t, c) => ({ ...t, [`${c.model}/${c.effort}`]: (t[`${c.model}/${c.effort}`] || 0) + 1 }), {});
+  console.log(`${w}: ${calls.length} agents (${Object.entries(tiers).map(([k, v]) => `${v} ${k}`).join(', ')})`);
+  console.log(calls.map(c => `  ${c.label}: ${c.model}/${c.effort}`).join('\n'));
+  if (problems.length) { console.log(`problems: ${problems.join('; ')}`); process.exit(1); }
+  console.log('Counts that depend on agent output (debug hypotheses) are shown at their minimum. Compare with the README cost table; opus/high agents dominate the cost.');
+  process.exit(0);
+}
+
 let bad = 0; const fail = (w, m) => { console.log(`FAIL ${w}: ${m}`); bad++; };
 for (const w of workflows) {
-  const src = fs.readFileSync(path.join(root, 'workflows', `${w}.js`), 'utf8');
   const mine = examples.filter(e => path.basename(e).startsWith(`${w}-`) && !workflows.some(o => o !== w && o.startsWith(`${w}-`) && path.basename(e).startsWith(`${o}-`)));
   if (!mine.length) { fail(w, 'no example args file'); continue; }
   for (const ex of mine) {
-    const name = `${w} ${path.relative(root, ex)}`; const calls = []; const problems = [];
-    const agent = async (prompt, o = {}) => {
-      calls.push(o);
-      if (/undefined|\[object Object\]/.test(prompt)) problems.push(`${o.label}: prompt contains ${prompt.match(/undefined|\[object Object\]/)[0]}`);
-      if (!o.model || !o.effort || !o.schema) problems.push(`${o.label}: missing ${['model', 'effort', 'schema'].filter(k => !o[k]).join(', ')}`);
-      return fake(o.schema);
-    };
-    const parallel = async thunks => Promise.all(thunks.map(t => Promise.resolve().then(t).catch(e => { problems.push(`thunk threw: ${e.message}`); return null; })));
-    const pipeline = async (items, ...stages) => Promise.all(items.map(async (it, i) => { let r = it; for (const s of stages) r = await s(r, it, i); return r; }));
-    const budget = { total: null, spent: () => 0, remaining: () => Infinity };
-    const run = new (Object.getPrototypeOf(async () => {}).constructor)('args', 'agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'workflow',
-      src.replace(/^export const meta/m, 'const meta'));
-    try {
-      // Placeholders at the start of a value ("<HOME>/...", "<REPO>") become absolute paths, as the skill would fill them.
-      const args = JSON.parse(fs.readFileSync(ex, 'utf8').replace(/"<([A-Z_]+)>/g, (_, k) => `"/${k.toLowerCase()}`));
-      const out = await run(args, agent, parallel, pipeline, () => {}, () => {}, budget, async () => null);
-      if (!out) problems.push('returned nothing');
-      const last = calls.at(-1);
-      if (!last || last.model !== 'opus') problems.push(`last agent is ${last && last.label} on ${last && last.model}, not the adversary on opus`);
-      if (calls.length > 10) problems.push(`${calls.length} agents; keep runs under 10 unless asked`);
-    } catch (e) { problems.push(`threw: ${e.message}`); }
-    if (problems.length) fail(name, problems.join('; ')); else console.log(`ok   ${name} (${calls.length} agents: ${calls.map(c => `${c.model}/${c.effort}`).join(' ')})`);
+    const name = `${w} ${path.relative(root, ex)}`, args = readArgs(ex);
+    const full = await runOnce(w, args, 'full');
+    const last = full.calls.at(-1);
+    if (!last || last.model !== 'opus') full.problems.push(`last agent is ${last && last.label} on ${last && last.model}, not the adversary on opus`);
+    const sparse = await runOnce(w, args, 'sparse');
+    const nulls = [];
+    for (let k = 0; k < full.calls.length; k++) {
+      const r = await runOnce(w, args, 'full', k);
+      if (r.problems.length) nulls.push(`agent ${k} (${full.calls[k].label}) null: ${r.problems.join(', ')}`);
+    }
+    const problems = [...full.problems, ...sparse.problems.map(p => `sparse: ${p}`), ...nulls];
+    if (problems.length) fail(name, problems.join('; '));
+    else console.log(`ok   ${name} (${full.calls.length} agents: ${full.calls.map(c => `${c.model}/${c.effort}`).join(' ')}; sparse and null passes clean)`);
   }
 }
-process.exit(bad ? 1 : 0);
+process.exit(bad || process.exitCode ? 1 : 0);

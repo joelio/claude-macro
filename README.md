@@ -44,7 +44,7 @@ Each workflow's `args` are documented at the top of its script; `examples/` has 
 ## Rules the agents follow
 
 - **Evidence tags.** Every claim is `measured`, `code`, `sourced` or `inferred`. A tag that overstates certainty is a defect.
-- **Citations.** Every claim carries at least one `{source, quote, via}`. No quote, no "confirmed". `via` records whether context7, exa, WebFetch or curl found it.
+- **Citations.** Claims carry `{source, quote, via}`. No quote, no "confirmed": the scripts demote an uncited confirmed verdict to unverifiable, and an uncited upheld or refuted verdict to untestable. Workers may leave citations empty rather than invent a quote. `via` records whether context7, exa, WebFetch or curl found it.
 - **Sources.** context7 for library behaviour, exa to find specs and vendor docs, `web_fetch_exa` for the exact text quoted, and curl when a tool is rate-limited.
 - **Numbers.** Method, n, median with IQR or min-max, and the unit.
 - **Safety.** Read-only against live systems with light traffic. Agents never edit, stash, reset or commit in the repo under study; code changes happen in disposable clones under the run folder.
@@ -55,8 +55,8 @@ Each workflow's `args` are documented at the top of its script; `examples/` has 
 
 `scripts/improve.sh [n]` runs a bounded, Ralph-style loop on this repo, n iterations (3 by default):
 
-1. Each iteration is a fresh headless Sonnet run. It takes the top item in `improve/BACKLOG.md`, does at most 5 context7 or exa lookups, makes the change, passes `npm test` and commits on an `improve/*` branch.
-2. An Opus run then reviews that commit and keeps or reverts it. A reverted item is blocked with the reviewer's reason.
+1. Each iteration is a fresh headless Sonnet run in `dontAsk` mode with a narrow tool list; git cannot push. It takes the top item in `improve/BACKLOG.md`, does at most 5 context7 or exa lookups, makes the change, passes `npm test` and commits on an `improve/*` branch.
+2. The checks are re-run from a pristine copy taken at start, and commits that touch the loop's own gates (`scripts/`, `tests/`, `package.json`, the improve prompts) are refused, so a worker can't loosen what judges it. An Opus run then reviews the commit and keeps or reverts it. A reverted or refused item is blocked with the reason.
 3. `MAX_USD_PER_RUN` (3 by default) caps each headless run's spend.
 
 It never pushes; review with `git log -p main..HEAD`.
@@ -64,7 +64,7 @@ It never pushes; review with `git log -p main..HEAD`.
 `npm test` is the loop's pass/fail check, and it costs no tokens:
 
 - `scripts/check-workflows.mjs` statically checks each workflow: pure meta, both-way phase match, Opus last, the evidence-tag enum, `{source, quote, via}` citations, the identical shared prelude, effort on every agent, no indented JSON in prompts, and harness syntax.
-- `tests/dry-run.mjs` runs every workflow against every example with a stubbed `agent()`.
+- `tests/dry-run.mjs` runs every workflow against every example with a stubbed `agent()`, three times: full output, sparse output, and with each agent in turn returning null. It also unit-checks `demote()`. `--estimate <args.json> <workflow>` shows a real run's agents and tiers before you spend tokens.
 
 ## Packs
 
@@ -83,7 +83,7 @@ Stack-specific harnesses live in `packs/<name>/` with their own examples and les
 | change-evidence (3 checks + benchmark + Opus) | 5 | 321k | 12.1 min |
 | config-change verify (5 + Opus attack) | 6 | 528k | 9.1 min |
 
-These runs predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (estimate, not yet measured). Keep a run under 10 agents unless asked, and scope each agent to one question.
+These runs predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (estimate, not yet measured). Keep a run to 10 agents or fewer unless asked (the dry run enforces it), and scope each agent to one question.
 
 ## Layout
 

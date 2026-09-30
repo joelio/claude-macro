@@ -64,6 +64,7 @@ for pack in ${PACKS[@]+"${PACKS[@]}"}; do
 done
 
 echo "Workflows"
-(cd "$REPO" && node scripts/check-workflows.mjs && node tests/dry-run.mjs) | sed 's/^/  /'
+if tests=$(cd "$REPO" && node scripts/check-workflows.mjs && node tests/dry-run.mjs 2>&1); then echo "$tests" | grep -v '^ok' | sed 's/^/  /'; ok "npm test ($(echo "$tests" | grep -c '^ok') checks)"
+else echo "$tests" | grep -v '^ok' | sed 's/^/  /'; echo "  FAIL  npm test"; missing=1; fi
 [ $missing = 0 ] && echo "Ready." || echo "Some items need attention (see above)."
 exit $missing

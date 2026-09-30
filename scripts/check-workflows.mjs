@@ -2,7 +2,8 @@
 // Workflows: meta is a pure literal with name, description and phases; phase() calls and
 // meta.phases match both ways; the last phase runs on opus; the body compiles as an async
 // function; schemas carry the evidence tags and {source, quote, via} citations; prompts
-// include the SOURCES block (exa and context7 first); every agent() call sets effort.
+// include the SOURCES block (exa and context7 first); every agent() call sets effort in its options;
+// every opus adversary prompt carries ADVERSARY_RULES.
 // The shared prelude (SOURCES, citation and objection schemas, helpers) must be identical in every
 // workflow, and prompts must not paste indented JSON. Comments are stripped first so a comment
 // cannot satisfy a rule.
@@ -26,7 +27,10 @@ for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
     const called = [...code.matchAll(/\bphase\((['"`])([^'"`]+)\1\)/g)].map(x => x[2]);
     for (const t of called) if (!titles.includes(t)) throw new Error(`phase('${t}') is not in meta.phases`);
     for (const t of titles) if (!called.includes(t)) throw new Error(`meta phase '${t}' has no phase() call`);
-    if ((m.phases || []).at(-1)?.model !== 'opus') throw new Error('the last phase must be the adversary on opus');
+    // The adversary phase is last, except for an optional mechanical Recheck phase on sonnet after it.
+    const ph = m.phases || [], trailing = ph.at(-1)?.title === 'Recheck';
+    if (trailing && ph.at(-1).model !== 'sonnet') throw new Error('a trailing Recheck phase is mechanical: model sonnet');
+    if (ph.at(trailing ? -2 : -1)?.model !== 'opus') throw new Error('the adversary phase must be last (before any Recheck) and on opus');
     if (!/\['measured', 'code', 'sourced', 'inferred'\]/.test(code)) throw new Error('no evidence tag enum (measured, code, sourced, inferred)');
     if (!/required: \['source', 'quote', 'via'\]/.test(code)) throw new Error('no citation schema requiring source, quote and via');
     if (!/\$\{SOURCES\}/.test(code) || !/mcp__exa__/.test(code) || !/context7/.test(code)) throw new Error('prompts must include the SOURCES block (exa and context7 first)');
@@ -37,9 +41,12 @@ for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
     if (/JSON\.stringify\([^)]*,\s*null\s*,\s*\d/.test(code)) throw new Error('indented JSON in a prompt costs tokens; use JSON.stringify(x)');
     const calls = code.split(/\bagent\(/).slice(1);
     calls.forEach((c, i) => {
-      const opts = c.slice(0, c.search(/\bschema:/) + 1 || undefined);
-      if (!/\bschema:/.test(c)) throw new Error(`agent() call ${i + 1} has no schema`);
+      // The options object runs from `label:` to `schema:`; look for effort and the model default only there.
+      const lab = c.search(/\{\s*label:/), sch = c.search(/\bschema:/);
+      if (lab < 0 || sch < lab) throw new Error(`agent() call ${i + 1}: options must be { label, ..., schema } after the prompt`);
+      const opts = c.slice(lab, sch), prompt = c.slice(0, lab);
       if (!/\beffort:/.test(opts)) throw new Error(`agent() call ${i + 1} does not set effort; it would inherit the session's`);
+      if (/\|\|\s*'opus'/.test(opts) && !/\$\{ADVERSARY_RULES\}/.test(prompt)) throw new Error(`agent() call ${i + 1} is an opus adversary without \${ADVERSARY_RULES}`);
     });
     Function('args', 'agent', 'parallel', 'pipeline', 'phase', 'log', 'budget', 'workflow',
       `return (async () => {${src.replace(/^export const meta/m, 'const meta')}})`);

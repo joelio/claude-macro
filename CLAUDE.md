@@ -22,7 +22,7 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
   - Evidence workers (measuring, reading code, finding sources): `sonnet`, effort `medium`.
   - Adversary or final reviewer: `opus`, effort `high`. Opus is only for the stage that judges.
   - `args` may override any of these per task. Never make the adversary weaker than the workers, and don't raise worker effort above `medium` without a reason.
-- Keep a run under 10 agents unless the user asks for more.
+- Keep a run to 10 agents or fewer unless the user asks for more.
 - Every worker returns a schema built from the shared prelude (`FACT`, `CITATIONS`, `OBJECTION`, `SAFE_CLAIMS`). The prelude between `// --- shared:` and `// --- end shared ---` must be byte-identical in every workflow; edit one, copy to all.
 - Every workflow has at least one example in `examples/` or a pack, named `<workflow>-*.json`, so the dry run covers it.
 - Adversary prompts carry compact JSON (`JSON.stringify(x)`), and verify's attackers get a slim view.

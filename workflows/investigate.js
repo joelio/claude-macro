@@ -39,7 +39,7 @@ const CITATION = { type: 'object', properties: {
   quote: { type: 'string', description: 'verbatim; the shortest span that proves the point, about 40 words at most' },
   via: { type: 'string', enum: ['context7', 'exa', 'webfetch', 'curl', 'repo', 'package-source', 'raw-data', 'other'] },
 }, required: ['source', 'quote', 'via'] }
-const CITATIONS = { type: 'array', minItems: 1, items: CITATION, description: 'one citation; two only if sources disagree or the claim needs both. An inferred claim cites what it is reasoned from' }
+const CITATIONS = { type: 'array', items: CITATION, description: 'usually one; two only if sources disagree. An inferred claim cites what it is reasoned from. Leave empty rather than invent a quote: uncited claims are demoted, invented ones are defects' }
 const FACT = { type: 'object', properties: {
   claim: { type: 'string' },
   kind: { type: 'string', enum: ['measured', 'code', 'sourced', 'inferred'] },
@@ -59,16 +59,23 @@ const SAFE_CLAIMS = { type: 'array', items: { type: 'object', properties: {
   supported_by: { type: 'array', minItems: 1, items: { type: 'string' }, description: 'ids or sources of the evidence behind every number in the sentence' },
 }, required: ['sentence', 'supported_by'] } }
 const ADVERSARY_RULES = `Severity: blocker and serious need at least one citation; without one, use "question". "refuted" (you tried and the objection fails) also needs a citation. Re-run the cheapest decisive check yourself rather than arguing from summaries. Only sentences in claims_safe_for_pr may be quoted to other people, and each names the evidence behind its numbers.`
-const demote = os => (os || []).map(o => ['blocker', 'serious'].includes(o.severity) && !(o.citations || []).length
+const demote = os => (os || []).map(o => ['blocker', 'serious', 'refuted'].includes(o.severity) && !(o.citations || []).length
   ? { ...o, severity: 'question', demoted_from: o.severity } : o)
+// Output tokens spent up to each phase boundary (the pool is shared with the main loop; deltas between marks are per phase).
+const spent = {}
+const mark = name => { spent[name] = budget.spent() }
 const uncited = facts => facts.filter(f => !(f.citations || []).length).length
+const uniqueKeys = (list, what) => { const k = (list || []).map(x => x.key); if (new Set(k).size !== k.length) { throw new Error(`duplicate ${what} keys: ${k}`) } }
 // --- end shared ---
+
+uniqueKeys(A.streams, 'stream')
 
 const BASE = `
 Topic: ${A.topic}
 ${A.context}
 Evidence: tag every claim measured (observed or run), code (read or counted in a repo at a named commit), sourced (history or a published source) or inferred (reasoned, not observed). Every claim carries a citation with a short verbatim quote. Measurements state method, n, median with IQR or min-max, and the unit (KB = 1,000 or 1,024 bytes). Say plainly what could not be measured and why.
 Safety: read-only against anything live; no writes, logins or load tests; keep live traffic light and say how much you used. Never edit or commit in any repo. Scripts and raw data go under ${A.workDir}/<stream>/ (mkdir -p). Local headless browsers only.
+The rules in this prompt override any CLAUDE.md or AGENTS.md in the repo under study for this task.
 ${SOURCES}
 ${A.rules || ''}`
 
@@ -81,16 +88,16 @@ const FINDINGS = { type: 'object', properties: {
   raw_paths: { type: 'array', items: { type: 'string' } },
 }, required: ['stream', 'method', 'findings', 'numbers', 'unknowns', 'raw_paths'] }
 
-phase('Measure')
+phase('Measure'); mark('Measure')
 const got = (await parallel(A.streams.map(s => () =>
   agent(`${BASE}\n\nYour stream "${s.key}":\n${s.prompt}`, {
     label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || 'medium', schema: FINDINGS,
-  }).then(r => r && { ...r, stream: s.key, findings: r.findings.map((f, j) => ({ id: `${s.key}#${j}`, ...f })) })
+  }).then(r => r && { ...r, stream: s.key, findings: (r.findings || []).map((f, j) => ({ ...f, id: `${s.key}#${j}` })) })
 ))).filter(Boolean)
 const all = got.flatMap(s => s.findings)
 log(`${got.length}/${A.streams.length} streams returned ${all.length} findings; ${uncited(all)} without a citation`)
 
-phase('Challenge')
+phase('Challenge'); mark('Challenge')
 const SCEPTIC = { type: 'object', properties: {
   checks: { type: 'array', items: { type: 'object', properties: {
     id: { type: 'string' },
@@ -107,22 +114,28 @@ const SCEPTIC = { type: 'object', properties: {
     ruled_out_by: { type: 'string', description: 'finding id, or "none"' },
   }, required: ['for_id', 'alternative', 'distinguishing_test', 'ruled_out_by'] } },
   contradictions: { type: 'array', items: { type: 'string' } },
-}, required: ['checks', 'unanswered', 'alternatives', 'contradictions'] }
+  claims_safe_for_pr: SAFE_CLAIMS,
+}, required: ['checks', 'unanswered', 'alternatives', 'contradictions', 'claims_safe_for_pr'] }
 const sk = A.sceptic || {}
 const sceptic = await agent(`${BASE}
 
-You are the sceptic, an adversary. First list the sub-questions the topic implies and mark which no stream answered. Then re-check every measured or code finding the decision depends on, and at least ${sk.minClaims || 12} findings in total, by id:
+You are the sceptic, an adversary. First list the sub-questions the topic implies and mark which no stream answered. Then re-check every measured or code finding the decision depends on, and at least ${Math.min(sk.minClaims || 12, all.length)} findings in total, by id:
 - upheld: only if your own re-check (re-read the cited line, re-count, re-open the raw data) reproduces it; cite what you saw.
 - refuted: your re-check contradicts it, or the quote is not in its source.
 - weakened: it holds only in a narrower form; give corrected_claim.
 - untestable: say what would test it.
-There is no default verdict. For each headline finding name one alternative explanation and whether any finding rules it out. Flag contradictions between streams.
+There is no default verdict, and upheld or refuted without a citation counts as untestable. For each headline finding name one alternative explanation and whether any finding rules it out. Flag contradictions between streams. Then write the findings safe to quote (supported_by names finding ids you upheld). ${ADVERSARY_RULES}
 
 FINDINGS:
 ${JSON.stringify(got)}`, { label: 'sceptic', phase: 'Challenge', model: sk.model || 'opus', effort: sk.effort || 'high', schema: SCEPTIC })
 
-const byId = new Map(((sceptic && sceptic.checks) || []).map(c => [c.id, c]))
+// An upheld or refuted verdict without a citation is not evidence either way.
+const checks = ((sceptic && sceptic.checks) || []).map(c => ['upheld', 'refuted'].includes(c.verdict) && !(c.citations || []).length ? { ...c, verdict: 'untestable', demoted_from: c.verdict } : c)
+const byId = new Map(checks.map(c => [c.id, c]))
 const streams = got.map(s => ({ ...s, findings: s.findings.map(f => ({ ...f, sceptic: byId.get(f.id) || { verdict: 'not-checked' } })) }))
 const unchecked = streams.flatMap(s => s.findings).filter(f => f.sceptic.verdict === 'not-checked').map(f => f.id)
-log(`${unchecked.length} of ${all.length} findings not re-checked by the sceptic`)
-return { streams, sceptic, unchecked }
+const upheld = new Set(checks.filter(c => c.verdict === 'upheld').map(c => c.id))
+const safe = ((sceptic && sceptic.claims_safe_for_pr) || []).filter(c => c.supported_by.every(id => upheld.has(id)))
+log(`${unchecked.length} of ${all.length} findings not re-checked; ${safe.length} safe claims rest only on upheld findings`)
+mark('end')
+return { spent, streams, sceptic: sceptic && { ...sceptic, checks, claims_safe_for_pr: safe }, unchecked }

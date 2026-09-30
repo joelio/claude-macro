@@ -28,7 +28,27 @@ Built from three Opus reviews of v0.1 (method, cost, fit) plus research on Ralph
 - `npm test`:
   - the checker also enforces an identical shared prelude and no indented JSON;
   - `tests/dry-run.mjs` runs every workflow and example with a stubbed agent.
-- `scripts/improve.sh`: a bounded Ralph-style loop in which Sonnet implements, `npm test` must pass, and Opus reviews. It never pushes.
+- `scripts/improve.sh`: a bounded Ralph-style loop in which Sonnet implements, pristine checks must pass, and Opus reviews. It runs in `dontAsk` with a narrow tool list, refuses commits to its own gates, and git cannot push.
+- Hardened after independent Opus and Fable reviews:
+  - Uncited confirmed, upheld and refuted verdicts are demoted, and citations are optional rather than forced, so workers don't invent quotes.
+  - Verify's safe claims are filtered against the attacks.
+  - The sceptic follows the same adversary rules.
+  - Debug:
+    - the reproduce and adjudicate agents may use the shared device;
+    - a test that could not have failed doesn't count as survival;
+    - clones carry staged and untracked work.
+  - Decide reports options that failed to be assessed.
+  - Duplicate keys are rejected.
+  - Prompt rules override the studied repo's CLAUDE.md.
+  - Per-phase output tokens appear in every result, as `spent`.
+- The dry run adds sparse and null passes, a `demote()` unit check and `--estimate`. The checker verifies effort inside the options object and that Opus adversaries carry the adversary rules.
+- Skill:
+  - pre-run estimate;
+  - `mkdir` of the run folder;
+  - lessons fed into `tools`;
+  - wall time and a quote spot-check;
+  - an opt-in owl second opinion;
+  - `did-it-help.md`.
 
 ## v0.1.0
 
