@@ -22,6 +22,7 @@ A tag stronger than the evidence is a defect. Grep counts are `code`, not `measu
 ```
 
 - **No quote, no "confirmed".** A URL alone proves nothing.
+- **A quote is source text, never a computation.** Put arithmetic in `evidence`. To cite a recomputation, save the script and its output under the work dir and quote the printed line. The quote check greps for it.
 - Keep quotes short and verbatim. Truncate with `…`, never paraphrase inside quotes.
 - For code: `path/to/file.rb:12-18` at a named commit or branch, quoting the line.
 - For data: the file and field (`results.json warm1.total.encoded`), or the query file and output row.

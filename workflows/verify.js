@@ -54,7 +54,7 @@ ${A.tools || ''}`
 
 const CITATION = { type: 'object', properties: {
   source: { type: 'string', description: 'file:line at a named commit, a URL, or a raw-data file and field' },
-  quote: { type: 'string', description: 'verbatim; the shortest span that proves the point, about 40 words at most' },
+  quote: { type: 'string', description: 'verbatim text copied from the source, about 40 words at most. Never a computation: arithmetic goes in evidence. To cite a recomputation, save the script and its output under the work dir and quote the printed line' },
   via: { type: 'string', enum: ['context7', 'exa', 'webfetch', 'curl', 'repo', 'package-source', 'raw-data', 'other'] },
 }, required: ['source', 'quote', 'via'] }
 const CITATIONS = { type: 'array', items: CITATION, description: 'usually one; two only if sources disagree. An inferred claim cites what it is reasoned from. Leave empty rather than invent a quote: uncited claims are demoted, invented ones are defects' }

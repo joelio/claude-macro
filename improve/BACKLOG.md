@@ -48,7 +48,7 @@ One item per loop iteration, top first. `- [ ]` open, `- [x]` done, `- [!]` bloc
   Done 2026-10-01: args.budgets split 80/20, with a usage ledger; the dry run tests an overrun.
 - [x] **Debug: a "known new since" hint** (same run). The biggest finding was that cluck at HEAD breaks on the current claude CLI, a regression unrelated to the report. Add a `versions` context field, and a hypothesise instruction to list environment drift (tool or CLI versions newer than the code) as its own hypothesis.
   Done 2026-10-01: the versions arg plus an environment-drift hypothesis.
-- [ ] **Eval: does macro beat a single agent?** (in progress 2026-10-01: harness built in `evals/`; pilot next) (needs a human, because it spends about 10M tokens for tier 0). See docs/research/2026-10-01-harness-engineering.md.
+- [ ] **Eval: does macro beat a single agent?** (in progress: harness built and pilot run 2026-10-01, see evals/results/2026-10-01-pilot.md; tier 0 needs a fresh session in a neutral directory) (needs a human, because it spends about 10M tokens for tier 0). See docs/research/2026-10-01-harness-engineering.md.
   - Arms: (A) a single Opus agent; (B) macro; (C) a single Opus agent given macro's rules, token-matched.
   - Tasks with reference answers and deterministic graders:
     - a blind debug with a known fix;
@@ -63,4 +63,5 @@ One item per loop iteration, top first. `- [ ]` open, `- [x]` done, `- [!]` bloc
   Done 2026-10-01: the inventory is returned in result.json as inventory.claims and missed; the skill writes result.json. A separate claims.json isn't needed.
 - [ ] **Retro changes gated on the eval** (research: forge's ablations). A prompt change the retro or loop proposes is kept only if the eval doesn't regress.
 - [ ] **Isolated grounding for adversaries** (research: forge; a hypothesis). Try an eval arm where the adversary gets the claims without the workers' framing.
-- [ ] **Harness output backpressure** (research: HumanLayer). Pack scripts print one-line summaries on success and write raw output to `OUT_DIR`.
+- [x] **Harness output backpressure** (research: HumanLayer). Pack scripts print one-line summaries on success and write raw output to `OUT_DIR`.
+  Done 2026-10-01: checked, and already compliant. The browser and bench scripts print one summary line per condition and write raw JSON to OUT_DIR; the nginx runner's PASS/FAIL lines are the result itself.

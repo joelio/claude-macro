@@ -22,6 +22,11 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 
 - **The slim adversary payload saves less than estimated.** On 61 synthetic verdicts shaped like the cluck run, the full payload is 19.9k characters, the slim view 17.1k (14% smaller), and slim with an attack limited to one group 14.0k (29% smaller). That's short of the 43% estimated in v0.2, because quotes are now kept on confirmed measured and code claims, which is most of a codebase check. Accuracy won over the saving; `attacks[].groups` is the lever that still pays.
 
+- **An eval task a single agent aces can't separate the arms.** In the pilot, one plain Opus agent found all 7 planted errors in the synthetic report, in 49 seconds and 55k tokens. Simple numeric reports don't need macro. Capability tasks must start with a low single-agent pass rate; real tasks (cluck-docs, debug-22) and subtler plants are where the comparison means something.
+- **Workflow agents inherit session context.** They got this session's CLAUDE.md and quoted the user's latest message. Run evals from a fresh session in a directory with no CLAUDE.md.
+
+- **Workers put arithmetic in the quote field.** In the pilot, the quote check reported "14+11+15+2+1 = 43" and "python3 recomputation" citations as not-found or source-missing. That's correct, but it knocked sound claims out of the safe list. The citation schema now says quotes are verbatim source text, arithmetic goes in `evidence`, and a recomputation is cited by quoting its saved output.
+
 ## Sources and tools
 
 - Exa's free tier rate-limits a parallel fan-out within minutes. Set `EXA_API_KEY` before `scripts/install.sh`. Otherwise agents fall back to curl of primary sources: RFC text, `chromium.googlesource.com/...?format=TEXT` (base64), raw GitHub at a tag.

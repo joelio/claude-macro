@@ -39,9 +39,19 @@ Rules for fairness:
 - Log infrastructure failures (rate limits, outages) separately and re-run them; don't count them as agent failures.
 - Read a sample of transcripts from each arm, to confirm the failures are fair.
 
+## Run it from a clean session
+
+Workflow agents inherit the session's context: the CLAUDE.md files in the session's working directory and above, and fragments of the conversation. The pilot ran in a session whose working directory's CLAUDE.md describes macro's method, and arm A's agents quoted the user's latest message. So arm A wasn't truly plain.
+
+For tier 0, start a new Claude Code session in a neutral directory with no CLAUDE.md (for example `~/.local/share/macro/eval/`), check that `~/.claude/CLAUDE.md` doesn't carry method instructions, and run every arm from there.
+
+## Results
+
+- [Pilot, 1 October 2026](results/2026-10-01-pilot.md): all three arms pass both report tasks, so the report is a ceiling task. B costs about 5 times A, and C about 2 times.
+
 ## Sizes
 
 - **Pilot:** `planted-report` and `clean-report` × 3 arms × 1 trial, about 2M tokens. It checks the tasks and graders against real output.
-- **Tier 0:** all four tasks × 3 arms × 3 trials, about 10M tokens. It can show only large effects; a difference of less than one task's worth is noise.
+- **Tier 0**, revised after the pilot: `cluck-docs` and `debug-22` × 3 arms × 3 trials, plus `clean-report` × 3 arms × 1, about 5M tokens. The synthetic `planted-report` is now a regression check only. Tier 0 can show only large effects; a difference of less than one task's worth is noise.
 
 Report pass^3 (every trial passes), and cost per passed task.

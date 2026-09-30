@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Eval pilot (evals/results/2026-10-01-pilot.md): all arms pass the report tasks, so they're ceiling and regression checks. B costs about 5 times A and C about 2 times. Tier 0 is refocused on cluck-docs and debug-22, to run from a clean session.
+- The citation schema says a quote is verbatim source text and arithmetic goes in `evidence`; recomputations cite their saved output.
+
 - `examples/verify-agent-config.json` audits a repo's Claude Code permissions, hooks and MCP servers, with a least-privilege attack. The web-perf verify example uses `attacks[].groups`. LESSONS records the measured slim-payload saving: 14%, or 29% with `groups`.
 
 - The eval (`evals/`): 4 tasks with answer keys (planted-report, clean-report, cluck-docs, debug-22), deterministic graders that `npm test` self-tests, a single-agent baseline for arms A and C, and blind trial preparation. Real macro output from dogfood runs 1 and 2 already grades as passing: cluck-docs 5/5, debug-22 2/2.
