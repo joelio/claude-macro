@@ -12,6 +12,9 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 - **KB vs KiB** produced a wrong "47%" that should have been 48.7%. State the unit.
 - **One machine, tight IQR** means repeatable, not representative. Report deltas, not absolute times, when arms run on different infrastructure.
 
+- **A shared budget in a prompt doesn't hold across parallel agents.** "At most 15 model calls in total" became 18, because no agent could see the others' use. Split budgets per agent in the script.
+- **Blind debug tests need the fix erased, not just checked out.** Clone, reset to the parent, delete remotes, tags and other branches, expire reflogs and `gc --prune=now`, then confirm with `git cat-file -e <fix>` that the fix is gone.
+
 ## Sources and tools
 
 - Exa's free tier rate-limits a parallel fan-out within minutes. Set `EXA_API_KEY` before `scripts/install.sh`. Otherwise agents fall back to curl of primary sources: RFC text, `chromium.googlesource.com/...?format=TEXT` (base64), raw GitHub at a tag.
