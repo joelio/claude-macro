@@ -4,6 +4,7 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 
 ## General traps
 
+- **Installers echo secrets.** A command echo printed an API key embedded in a URL into the transcript. Mask keys in anything a script prints (scripts/install.sh mask()).
 - **An agent's `git checkout`, `stash` or `reset` in the repo under study destroys uncommitted work.** Workflows forbid it; changes happen in `git clone --local` copies under the work dir.
 - **A merged config change is not a deployed one.** Check what is running, not what is on main.
 - **Warm-up skews the first runs** (JIT, disk cache, GPU clocks, CPU boost). Discard warm-ups and interleave arms.
@@ -25,5 +26,3 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 - The Opus adversary caught real design errors (an unnecessary `proxy_hide_header` plan, a wrong ordering constraint), and once asserted a fact the earlier evidence had already disproved. Read its output as critically as anyone else's.
 - The sceptic step pays for itself. Keep it.
 - A fresh verify pass over a report that had already been verified still found 4 wrong claims and flipped the option ranking, mostly by joining evidence from later runs. Worth doing before a report is circulated widely.
-
-- **Installers echo secrets.** A command echo printed an API key embedded in a URL into the transcript. Mask keys in anything a script prints (scripts/install.sh mask()).
