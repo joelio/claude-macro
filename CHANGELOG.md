@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Debug and decide log how many facts lack a citation, like investigate and verify. LESSONS records that schemas are validated at the tool-call layer with a retry.
+
 - From harness-engineering research (docs/research/2026-10-01-harness-engineering.md):
   - Every workflow returns `not_run`, listing agents that failed or were skipped; the dry run's null pass enforces it.
   - A prompt-injection rule in the shared prelude.

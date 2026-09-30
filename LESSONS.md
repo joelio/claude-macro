@@ -15,6 +15,8 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 - **A shared budget in a prompt doesn't hold across parallel agents.** "At most 15 model calls in total" became 18, because no agent could see the others' use. Split budgets per agent in the script.
 - **Blind debug tests need the fix erased, not just checked out.** Clone, reset to the parent, delete remotes, tags and other branches, expire reflogs and `gc --prune=now`, then confirm with `git cat-file -e <fix>` that the fix is gone.
 
+- **Schemas are checked at the tool-call layer, and the model retries on a mismatch.** The Workflow runtime forces a StructuredOutput call and validates it against the JSON Schema, so `required` and `enum` hold and `agent()` returns a validated object; `required` must be a subset of `properties`, or the call throws at `agent()` (source: the `workflow-authoring` skill, "validation happens at the tool-call layer so the model retries on mismatch"; I found no runtime doc that names `minItems` specifically, so treat it as enforced the same way but unconfirmed). Consequence: `minItems` on `CITATIONS` would force a quote on every fact and invite invented ones, so v0.2 leaves it off and the scripts log `uncited` counts instead (investigate, verify, debug, decide). The dry run builds fake data from `minItems` but doesn't test the runtime. A retry costs tokens, so keep schemas lean.
+
 ## Sources and tools
 
 - Exa's free tier rate-limits a parallel fan-out within minutes. Set `EXA_API_KEY` before `scripts/install.sh`. Otherwise agents fall back to curl of primary sources: RFC text, `chromium.googlesource.com/...?format=TEXT` (base64), raw GitHub at a tag.

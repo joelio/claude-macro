@@ -153,6 +153,8 @@ const [freeRes, heldRes] = await parallel([
 // A test that could not have failed does not count as survival.
 const tested = [...(freeRes || []), ...(heldRes || [])].filter(Boolean)
   .map(t => t.outcome === 'survived' && !t.could_have_failed ? { ...t, outcome: 'inconclusive', demoted_from: 'survived' } : t)
+const testFacts = tested.flatMap(t => t.facts || [])
+log(`${tested.length}/${hyps.length} hypotheses tested; ${uncited(testFacts)} of ${testFacts.length} facts without a citation`)
 
 phase('Adjudicate'); mark('Adjudicate')
 const VERDICT = { type: 'object', properties: {
