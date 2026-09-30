@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The exa API key moves to the OS keychain. `scripts/exa-headers.sh` sends it as an `x-api-key` header through Claude Code's `headersHelper`, so it is never stored in `~/.claude.json` or shown by `claude mcp list`. `install.sh --update-mcp` migrates older installs with the key in the URL.
+- Effort profiles: `args.profile` is one of `quick`, `standard`, `deep` or `max`; per-task effort still overrides it. The dry run covers every profile.
+
 - Ideas from awesome-harness-engineering:
   - a write-time check hook (ECC's Plankton idea);
   - `improve.sh --retro`, which turns real runs into lessons and backlog items (ECC continuous learning plus gstack retro);

@@ -19,6 +19,7 @@ export const meta = {
 //   shared?: [{ key, prompt, effort? }],   // option-independent streams, e.g. a usage map of the dependency
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools',
 //   workerModel?: 'sonnet', attackModel?: 'opus', attackEffort?: 'high'
+//   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
 if (!A.question || !A.context) { throw new Error('args.question and args.context are required') }
@@ -29,6 +30,12 @@ if (!A.options || A.options.length < 2) { throw new Error('args.options needs at
 const W = A.workerModel || 'sonnet'
 
 // --- shared: keep identical in every workflow (scripts/check-workflows.mjs compares them) ---
+// Effort profile for the whole run. 'standard' balances quality against quota; use 'deep' or 'max' for hard or
+// high-stakes questions, 'quick' for smoke tests. An effort set on a single stream, group, check or attack wins.
+const PROFILES = { quick: { work: 'low', judge: 'medium' }, standard: { work: 'medium', judge: 'high' },
+  deep: { work: 'high', judge: 'xhigh' }, max: { work: 'high', judge: 'max' } }
+const E = PROFILES[A.profile || 'standard']
+if (!E) { throw new Error(`args.profile must be one of ${Object.keys(PROFILES).join(', ')}`) }
 const SOURCES = `
 Sources (exa and context7 are installed at user scope by the macro repo's scripts/install.sh; use them first):
 - Load them: ToolSearch "select:mcp__exa__web_search_exa,mcp__exa__web_fetch_exa,mcp__exa__get_code_context_exa,mcp__context7__resolve-library-id,mcp__context7__query-docs". If those names are not found, ToolSearch "exa" and "context7" and use what matches.
@@ -115,11 +122,11 @@ const STREAM = { type: 'object', properties: {
 phase('Evidence'); mark('Evidence')
 const optionTasks = A.options.map(o => () =>
   agent(`${BASE}\n\nOption "${o.key}": ${o.prompt}\nRate this option, and only this option, against every criterion. Look hardest for its dealbreakers.`,
-    { label: `option:${o.key}`, phase: 'Evidence', model: W, effort: o.effort || 'medium', schema: OPTION })
+    { label: `option:${o.key}`, phase: 'Evidence', model: W, effort: o.effort || E.work, schema: OPTION })
     .then(r => r && { ...r, option: o.key }))
 const sharedTasks = (A.shared || []).map(s => () =>
   agent(`${BASE}\n\nShared stream "${s.key}" (applies to every option): ${s.prompt}`,
-    { label: `shared:${s.key}`, phase: 'Evidence', model: W, effort: s.effort || 'medium', schema: STREAM })
+    { label: `shared:${s.key}`, phase: 'Evidence', model: W, effort: s.effort || E.work, schema: STREAM })
     .then(r => r && { ...r, stream: s.key }))
 const got = (await parallel([...optionTasks, ...sharedTasks])).filter(Boolean)
 const options = got.filter(g => g.option), shared = got.filter(g => g.stream)
@@ -150,7 +157,7 @@ ${JSON.stringify(options)}
 
 SHARED:
 ${JSON.stringify(shared)}`,
-{ label: 'attack', phase: 'Attack', model: A.attackModel || 'opus', effort: A.attackEffort || 'high', schema: DECISION })
+{ label: 'attack', phase: 'Attack', model: A.attackModel || 'opus', effort: A.attackEffort || E.judge, schema: DECISION })
 
 if (decision) { decision.objections = demote(decision.objections) }
 mark('end')

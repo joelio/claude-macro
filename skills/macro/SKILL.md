@@ -11,6 +11,7 @@ The method, rules and workflows live in the repo this skill belongs to; call its
 
 ## Preflight
 
+- Check tools with ToolSearch or `<repo>/scripts/install.sh --check`. Never print `claude mcp list` or `claude mcp get` output: older installs embedded API keys in server URLs.
 - If `ToolSearch "exa"` or `ToolSearch "context7"` finds nothing, tell the user to run `<repo>/scripts/install.sh` and restart Claude Code. Continue without them only if they agree; agents then fall back to WebFetch and curl.
 - If the run needs a pack's harness (e.g. `packs/web-perf/harness`) and its `node_modules` is missing, the install is `<repo>/scripts/install.sh --pack <name>`.
 
@@ -34,7 +35,10 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
    - Stop when every field the workflow needs is settled. Vague args waste a whole run.
 2. Pick a run folder: `mkdir -p ~/.local/share/macro/<project>/<YYYY-MM-DD>-<slug>/` (today's date from the shell). It is the `workDir`. Save the args there as `args.json`.
 3. Write `args` from the closest file in `<repo>/examples/` or `<repo>/packs/*/examples/`. Replace every `<PLACEHOLDER>`; estate details (paths, hosts, asset names, tables) go in args, never in a script. Put what earlier runs learned into `tools`: the relevant trap bullets from `LESSONS.md` (and the pack's), and this project's lines from `~/.local/share/macro/INDEX.md`. Add stack hints there too (e.g. `CARGO_TARGET_DIR`, `. $IDF_PATH/export.sh`, `uv venv`).
-4. Tier the cost: `"effort": "low"` for mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes); the default is Sonnet at `medium`; the adversary is Opus at `high`. Change models only if the user asks, and never make the adversary weaker than the workers. Keep it under 10 agents unless the user asks for more.
+4. Tier the cost:
+   - Give mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes) `"effort": "low"`.
+   - The default is Sonnet at `medium` and the adversary Opus at `high`.
+   - For a hard or high-stakes question, suggest `"profile": "deep"` or `"max"` and say that it costs more; use `"quick"` for smoke tests. Change models only if the user asks, and never make the adversary weaker than the workers. Keep it under 10 agents unless the user asks for more.
 5. Run `node <repo>/tests/dry-run.mjs --estimate <workDir>/args.json <workflow>`; fix any problem it reports. Note the time (`date +%s`). Call the Workflow tool with `scriptPath` set to `<repo>/workflows/<name>.js` and `args` as a JSON object (not a string). If `scriptPath` outside the session is refused, read the script and pass it as `script`.
 6. While it runs, tell the user in a few lines what each agent covers. Don't predict results.
 

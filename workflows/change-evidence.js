@@ -18,6 +18,7 @@ export const meta = {
 //   benchmark?: { prompt, kind?, effort? },           // kind: 'process' (default) | 'browser' | 'device' | 'gpu'; omit when timing is not the question
 //   qaAudience?: 'who verifies and with what',        // default: the developer, locally
 //   workerModel?: 'sonnet', reviewModel?: 'opus', reviewEffort?: 'high'
+//   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
 if (!A.change || !A.context) { throw new Error('args.change and args.context are required') }
@@ -25,6 +26,12 @@ if (!A.workDir || !A.workDir.startsWith('/')) { throw new Error('args.workDir mu
 if (!A.checks || !A.checks.length) { throw new Error('args.checks is required') }
 
 // --- shared: keep identical in every workflow (scripts/check-workflows.mjs compares them) ---
+// Effort profile for the whole run. 'standard' balances quality against quota; use 'deep' or 'max' for hard or
+// high-stakes questions, 'quick' for smoke tests. An effort set on a single stream, group, check or attack wins.
+const PROFILES = { quick: { work: 'low', judge: 'medium' }, standard: { work: 'medium', judge: 'high' },
+  deep: { work: 'high', judge: 'xhigh' }, max: { work: 'high', judge: 'max' } }
+const E = PROFILES[A.profile || 'standard']
+if (!E) { throw new Error(`args.profile must be one of ${Object.keys(PROFILES).join(', ')}`) }
 const SOURCES = `
 Sources (exa and context7 are installed at user scope by the macro repo's scripts/install.sh; use them first):
 - Load them: ToolSearch "select:mcp__exa__web_search_exa,mcp__exa__web_fetch_exa,mcp__exa__get_code_context_exa,mcp__context7__resolve-library-id,mcp__context7__query-docs". If those names are not found, ToolSearch "exa" and "context7" and use what matches.
@@ -95,7 +102,7 @@ const RESULT = { type: 'object', properties: {
 phase('Check'); mark('Check')
 const checks = (await parallel(A.checks.map(c => () =>
   agent(`${BASE}\n\nTask "${c.key}":\n${c.prompt}\nReport what you found and rate each result's bearing on the change honestly; leave the verdict on the change to the reviewer.`,
-    { label: `check:${c.key}`, phase: 'Check', model: A.workerModel || 'sonnet', effort: c.effort || 'medium', schema: RESULT })
+    { label: `check:${c.key}`, phase: 'Check', model: A.workerModel || 'sonnet', effort: c.effort || E.work, schema: RESULT })
     .then(r => r && { ...r, task: c.key, results: (r.results || []).map((x, j) => ({ ...x, id: `${c.key}#${j}` })) })
 ))).filter(Boolean)
 
@@ -111,7 +118,7 @@ if (A.benchmark) {
   const kind = A.benchmark.kind || 'process'
   bench = await agent(`${BASE}\n\nTask "benchmark" (you run alone; start no other heavy processes):\n${A.benchmark.prompt}
 Design rules: ${BENCH_RULES[kind] || BENCH_RULES.process} Interleave arms in a seeded shuffle (write your own PRNG, record the seed), n >= 20 per arm per condition, report median, IQR, min-max and a bootstrap 95% CI of the median difference. Record machine details and ambient load.`,
-    { label: 'benchmark', phase: 'Benchmark', model: A.workerModel || 'sonnet', effort: A.benchmark.effort || 'medium', schema: RESULT })
+    { label: 'benchmark', phase: 'Benchmark', model: A.workerModel || 'sonnet', effort: A.benchmark.effort || E.work, schema: RESULT })
     .then(r => r && { ...r, task: 'benchmark', results: (r.results || []).map((x, j) => ({ ...x, id: `benchmark#${j}` })) })
 }
 const all = [...checks, bench].filter(Boolean)
@@ -130,7 +137,7 @@ const challenge = await agent(`${BASE}
 You are the adversarial reviewer. Try hard to find reasons the change is wrong or risky, or that its evidence is weak. ${ADVERSARY_RULES} Then write the claims safe to quote (supported_by lists result ids exactly as given, e.g. "bytes#2"), verification steps for ${A.qaAudience || 'the developer, locally'} with an expected result each, any engineer-only steps, and a verdict.
 
 EVIDENCE:
-${JSON.stringify(all)}`, { label: 'challenge', phase: 'Challenge', model: A.reviewModel || 'opus', effort: A.reviewEffort || 'high', schema: CHALLENGE })
+${JSON.stringify(all)}`, { label: 'challenge', phase: 'Challenge', model: A.reviewModel || 'opus', effort: A.reviewEffort || E.judge, schema: CHALLENGE })
 if (challenge) { challenge.objections = demote(challenge.objections) }
 
 mark('end')

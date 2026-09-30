@@ -16,6 +16,7 @@ export const meta = {
 //   streams: [{ key, prompt, model?, effort? }],   // 4-6 streams, each a different way of knowing; effort 'low' for mechanical ones
 //   workerModel?: 'sonnet',
 //   sceptic?: { model?, effort?, minClaims? }      // defaults 'opus', 'high', 12
+//   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
 if (!A.topic || !A.context) { throw new Error('args.topic and args.context are required') }
@@ -23,6 +24,12 @@ if (!A.workDir || !A.workDir.startsWith('/')) { throw new Error('args.workDir mu
 if (!A.streams || !A.streams.length) { throw new Error('args.streams is required') }
 
 // --- shared: keep identical in every workflow (scripts/check-workflows.mjs compares them) ---
+// Effort profile for the whole run. 'standard' balances quality against quota; use 'deep' or 'max' for hard or
+// high-stakes questions, 'quick' for smoke tests. An effort set on a single stream, group, check or attack wins.
+const PROFILES = { quick: { work: 'low', judge: 'medium' }, standard: { work: 'medium', judge: 'high' },
+  deep: { work: 'high', judge: 'xhigh' }, max: { work: 'high', judge: 'max' } }
+const E = PROFILES[A.profile || 'standard']
+if (!E) { throw new Error(`args.profile must be one of ${Object.keys(PROFILES).join(', ')}`) }
 const SOURCES = `
 Sources (exa and context7 are installed at user scope by the macro repo's scripts/install.sh; use them first):
 - Load them: ToolSearch "select:mcp__exa__web_search_exa,mcp__exa__web_fetch_exa,mcp__exa__get_code_context_exa,mcp__context7__resolve-library-id,mcp__context7__query-docs". If those names are not found, ToolSearch "exa" and "context7" and use what matches.
@@ -91,7 +98,7 @@ const FINDINGS = { type: 'object', properties: {
 phase('Measure'); mark('Measure')
 const got = (await parallel(A.streams.map(s => () =>
   agent(`${BASE}\n\nYour stream "${s.key}":\n${s.prompt}`, {
-    label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || 'medium', schema: FINDINGS,
+    label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || E.work, schema: FINDINGS,
   }).then(r => r && { ...r, stream: s.key, findings: (r.findings || []).map((f, j) => ({ ...f, id: `${s.key}#${j}` })) })
 ))).filter(Boolean)
 const all = got.flatMap(s => s.findings)
@@ -127,7 +134,7 @@ You are the sceptic, an adversary. First list the sub-questions the topic implie
 There is no default verdict, and upheld or refuted without a citation counts as untestable. For each headline finding name one alternative explanation and whether any finding rules it out. Flag contradictions between streams. Then write the findings safe to quote (supported_by names finding ids you upheld). ${ADVERSARY_RULES}
 
 FINDINGS:
-${JSON.stringify(got)}`, { label: 'sceptic', phase: 'Challenge', model: sk.model || 'opus', effort: sk.effort || 'high', schema: SCEPTIC })
+${JSON.stringify(got)}`, { label: 'sceptic', phase: 'Challenge', model: sk.model || 'opus', effort: sk.effort || E.judge, schema: SCEPTIC })
 
 // An upheld or refuted verdict without a citation is not evidence either way.
 const checks = ((sceptic && sceptic.checks) || []).map(c => ['upheld', 'refuted'].includes(c.verdict) && !(c.citations || []).length ? { ...c, verdict: 'untestable', demoted_from: c.verdict } : c)

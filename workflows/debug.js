@@ -20,6 +20,7 @@ export const meta = {
 //   exclusive?: 'a resource only one test may use at a time, e.g. the ESP32 on /dev/cu.usbserial-0001, the one GPU, port 5432',
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools',
 //   workerModel?: 'sonnet', judgeModel?: 'opus', judgeEffort?: 'high'
+//   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
 if (!A.symptom || !A.context) { throw new Error('args.symptom and args.context are required') }
@@ -29,6 +30,12 @@ const MAX = A.maxHypotheses || 5
 const W = A.workerModel || 'sonnet'
 
 // --- shared: keep identical in every workflow (scripts/check-workflows.mjs compares them) ---
+// Effort profile for the whole run. 'standard' balances quality against quota; use 'deep' or 'max' for hard or
+// high-stakes questions, 'quick' for smoke tests. An effort set on a single stream, group, check or attack wins.
+const PROFILES = { quick: { work: 'low', judge: 'medium' }, standard: { work: 'medium', judge: 'high' },
+  deep: { work: 'high', judge: 'xhigh' }, max: { work: 'high', judge: 'max' } }
+const E = PROFILES[A.profile || 'standard']
+if (!E) { throw new Error(`args.profile must be one of ${Object.keys(PROFILES).join(', ')}`) }
 const SOURCES = `
 Sources (exa and context7 are installed at user scope by the macro repo's scripts/install.sh; use them first):
 - Load them: ToolSearch "select:mcp__exa__web_search_exa,mcp__exa__web_fetch_exa,mcp__exa__get_code_context_exa,mcp__context7__resolve-library-id,mcp__context7__query-docs". If those names are not found, ToolSearch "exa" and "context7" and use what matches.
@@ -124,9 +131,9 @@ const TEST = { type: 'object', properties: {
 phase('Hypothesise'); mark('Hypothesise')
 const [repro, gen] = await parallel([
   () => agent(`${BASE}\n\nTask "reproduce": find the smallest reliable reproduction. If it may be intermittent, run it at least 5 times and report k of n. Record commit, versions, OS and hardware. Save error text, stack traces and logs verbatim. Do not look for the cause.${A.exclusive ? ` You hold ${A.exclusive} for this task; release it before you return.` : ''}`,
-    { label: 'reproduce', phase: 'Hypothesise', model: W, effort: 'medium', schema: REPRO }),
+    { label: 'reproduce', phase: 'Hypothesise', model: W, effort: E.work, schema: REPRO }),
   () => agent(`${BASE}\n\nTask "hypothesise": read the failing code path, git log and blame near it, and the changelogs and issue trackers for the pinned dependency versions. List up to ${MAX} competing hypotheses that could each explain the symptom, including at least one outside the code under study (environment, dependency, toolchain, hardware, data). For each give the cheapest test that would prove it FALSE, and set needs_exclusive if that test needs ${A.exclusive || 'a resource only one test can use at a time'}. Rank by prior. Do not run the tests.`,
-    { label: 'hypothesise', phase: 'Hypothesise', model: W, effort: 'medium', schema: HYPS }),
+    { label: 'hypothesise', phase: 'Hypothesise', model: W, effort: E.work, schema: HYPS }),
 ])
 const mine = (A.hypotheses || []).map(h => ({ key: h.key, statement: h.statement, kill_test: h.test || 'choose the cheapest decisive test', needs_exclusive: !!h.exclusive, explains: 'suggested by the developer', prior: 'medium', basis: [] }))
 const seen = new Set(mine.map(h => h.key))
@@ -136,7 +143,7 @@ log(`reproduced: ${repro ? repro.reproduced : 'unknown'}; testing ${hyps.map(h =
 
 phase('Falsify'); mark('Falsify')
 const falsify = (h, holds) => agent(`${BASE}\n\nREPRODUCTION:\n${JSON.stringify(repro)}\n\nTask "falsify:${h.key}". Hypothesis: ${h.statement}\nSuggested kill test: ${h.kill_test}\nTry honestly to prove it FALSE with the cheapest decisive test; use a better test if you see one. "falsified" needs a measured or code fact that contradicts it. "survived" means a test that could have failed did not. Otherwise "inconclusive", with the test that would settle it.${holds ? ` You hold ${A.exclusive || 'the shared resource'} for this task; release it (close monitors and ports) before you return.` : ''}`,
-  { label: `falsify:${h.key}`, phase: 'Falsify', model: W, effort: 'medium', schema: TEST }).then(r => r && { ...r, key: h.key, statement: h.statement })
+  { label: `falsify:${h.key}`, phase: 'Falsify', model: W, effort: E.work, schema: TEST }).then(r => r && { ...r, key: h.key, statement: h.statement })
 const free = hyps.filter(h => !h.needs_exclusive), held = hyps.filter(h => h.needs_exclusive)
 const [freeRes, heldRes] = await parallel([
   () => parallel(free.map(h => () => falsify(h, false))),
@@ -168,7 +175,7 @@ ${JSON.stringify(repro)}
 
 HYPOTHESES AND TESTS:
 ${JSON.stringify({ generated: gen, tested })}`,
-{ label: 'adjudicate', phase: 'Adjudicate', model: A.judgeModel || 'opus', effort: A.judgeEffort || 'high', schema: VERDICT })
+{ label: 'adjudicate', phase: 'Adjudicate', model: A.judgeModel || 'opus', effort: A.judgeEffort || E.judge, schema: VERDICT })
 
 if (verdict) { verdict.objections = demote(verdict.objections) }
 mark('end')

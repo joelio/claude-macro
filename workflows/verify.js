@@ -17,6 +17,7 @@ export const meta = {
 //   logic?: { prompt?, model?, effort? },           // always runs after the groups; defaults 'opus', 'high'
 //   attacks?: [{ key, prompt, effort?, groups? }],  // one per recommendation; groups limits which verdicts it reads (all by default)
 //   workerModel?: 'sonnet', attackModel?: 'opus'
+//   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
 if (!A.target || !A.context) { throw new Error('args.target and args.context are required') }
@@ -28,6 +29,12 @@ for (const t of A.attacks || []) for (const k of t.groups || []) {
 }
 
 // --- shared: keep identical in every workflow (scripts/check-workflows.mjs compares them) ---
+// Effort profile for the whole run. 'standard' balances quality against quota; use 'deep' or 'max' for hard or
+// high-stakes questions, 'quick' for smoke tests. An effort set on a single stream, group, check or attack wins.
+const PROFILES = { quick: { work: 'low', judge: 'medium' }, standard: { work: 'medium', judge: 'high' },
+  deep: { work: 'high', judge: 'xhigh' }, max: { work: 'high', judge: 'max' } }
+const E = PROFILES[A.profile || 'standard']
+if (!E) { throw new Error(`args.profile must be one of ${Object.keys(PROFILES).join(', ')}`) }
 const SOURCES = `
 Sources (exa and context7 are installed at user scope by the macro repo's scripts/install.sh; use them first):
 - Load them: ToolSearch "select:mcp__exa__web_search_exa,mcp__exa__web_fetch_exa,mcp__exa__get_code_context_exa,mcp__context7__resolve-library-id,mcp__context7__query-docs". If those names are not found, ToolSearch "exa" and "context7" and use what matches.
@@ -98,7 +105,7 @@ const CLAIMS = { type: 'object', properties: {
 
 phase('Verify'); mark('Verify')
 const verified = (await parallel(A.groups.map(g => () =>
-  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}`, { label: `verify:${g.key}`, phase: 'Verify', model: g.model || A.workerModel || 'sonnet', effort: g.effort || 'medium', schema: CLAIMS })
+  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}`, { label: `verify:${g.key}`, phase: 'Verify', model: g.model || A.workerModel || 'sonnet', effort: g.effort || E.work, schema: CLAIMS })
     .then(r => r && { ...r, group: g.key, claims: (r.claims || []).map(c => ({ ...c, id: `${g.key}:${c.id}` }))
       // No quote, no "confirmed".
       .map(c => c.verdict === 'confirmed' && !(c.citations || []).length ? { ...c, verdict: 'unverifiable', demoted_from: 'confirmed' } : c) })
@@ -140,10 +147,10 @@ const ATTACK = { type: 'object', properties: {
 const L = A.logic || {}
 const [logic, ...attacks] = await parallel([
   () => agent(`${BASE}\n\nLogic review, an adversary. ${L.prompt || ''}\nFor each conclusion or recommendation in the target: its premises and each premise's verdict from the results below; whether it follows; hidden assumptions, overgeneralisation, confounders, missing alternatives, and tags stronger than the evidence. A conclusion resting on a wrong or unverifiable premise is unsupported. In claims_safe_for_pr, supported_by lists claim ids exactly as given. ${ADVERSARY_RULES}\n\nVERIFICATION RESULTS (compact; open a source if you need the text of a confirmed claim):\n${JSON.stringify(slim(verified))}`,
-    { label: 'logic', phase: 'Attack', model: L.model || A.attackModel || 'opus', effort: L.effort || 'high', schema: LOGIC }),
+    { label: 'logic', phase: 'Attack', model: L.model || A.attackModel || 'opus', effort: L.effort || E.judge, schema: LOGIC }),
   ...(A.attacks || []).map(t => () =>
     agent(`${BASE}\n\n${t.prompt}\nArgue AGAINST it as hard as you honestly can: security, operations, benefit, cheaper alternatives. ${ADVERSARY_RULES}\n\nVERIFICATION RESULTS (compact):\n${JSON.stringify(slim(verified, t.groups))}`,
-      { label: `attack:${t.key}`, phase: 'Attack', model: A.attackModel || 'opus', effort: t.effort || 'high', schema: ATTACK })
+      { label: `attack:${t.key}`, phase: 'Attack', model: A.attackModel || 'opus', effort: t.effort || E.judge, schema: ATTACK })
       .then(r => r && { ...r, target: t.key, objections: demote(r.objections) })),
 ])
 const attacked = attacks.filter(Boolean)

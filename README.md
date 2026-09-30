@@ -49,7 +49,7 @@ Each workflow's `args` are documented at the top of its script; `examples/` has 
 - **Numbers.** Method, n, median with IQR or min-max, and the unit.
 - **Safety.** Read-only against live systems with light traffic. Agents never edit, stash, reset or commit in the repo under study; code changes happen in disposable clones under the run folder.
 - **Adversary last, and held to the same standard.** An uncited blocker or serious objection is demoted to a question. Only `claims_safe_for_pr` sentences, each naming its evidence, go to other people.
-- **Cost tiers.** Sonnet at `low` effort for mechanical work and `medium` for evidence; Opus at `high` only for the adversary. Effort is always explicit (an omitted one inherits the session's), and adversary prompts carry compact JSON. Override models or effort in `args`, but never make the adversary weaker than the workers.
+- **Cost tiers.** Sonnet at `low` effort for mechanical work and `medium` for evidence; Opus at `high` only for the adversary. Effort is always explicit (an omitted one inherits the session's), and adversary prompts carry compact JSON. For a hard or high-stakes question, set `"profile": "deep"` (workers high, adversary xhigh) or `"max"` (workers high, adversary max); `"quick"` suits smoke tests. Per-task `effort` still overrides the profile. Override models in `args` if needed, but never make the adversary weaker than the workers.
 
 ## Self-improvement loop
 

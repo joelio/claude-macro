@@ -21,7 +21,15 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
   - Mechanical work (counting bytes, re-checking file:line, running a build, re-deriving numbers): `sonnet`, effort `low`.
   - Evidence workers (measuring, reading code, finding sources): `sonnet`, effort `medium`.
   - Adversary or final reviewer: `opus`, effort `high`. Opus is only for the stage that judges.
-  - `args` may override any of these per task. Never make the adversary weaker than the workers, and don't raise worker effort above `medium` without a reason.
+  - `args.profile` sets the defaults for a whole run:
+    - `quick`: workers low, adversary medium;
+    - `standard` (the default): workers medium, adversary high;
+    - `deep`: workers high, adversary xhigh;
+    - `max`: workers high, adversary max.
+
+    Use `deep` or `max` when a question is hard or the stakes are high.
+  - An effort set on a single stream, group, check or attack overrides the profile.
+  - Never make the adversary weaker than the workers. Use the shared prelude's `E.work` and `E.judge` as defaults, never literal efforts.
 - Keep a run to 10 agents or fewer unless the user asks for more.
 - Every worker returns a schema built from the shared prelude (`FACT`, `CITATIONS`, `OBJECTION`, `SAFE_CLAIMS`). The prelude between `// --- shared:` and `// --- end shared ---` must be byte-identical in every workflow; edit one, copy to all.
 - Every workflow has at least one example in `examples/` or a pack, named `<workflow>-*.json`, so the dry run covers it.

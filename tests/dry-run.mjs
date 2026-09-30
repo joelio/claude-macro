@@ -3,6 +3,7 @@
 //   full   - every schema field filled, first enum value, one item per array;
 //   sparse - empty arrays where the schema allows, enum values varied by call;
 //   null   - each agent in turn returns null (as when it fails or is skipped).
+// Each example also runs under the quick, deep and max profiles, and an unknown profile must be rejected.
 // Fails on a thrown error, undefined or [object Object] in a prompt, an agent without model, effort or schema,
 // more than 10 agents, or (full pass) a last agent that is not the adversary on opus.
 // Examples are matched by file name: examples/<workflow>-*.json and packs/*/examples/<workflow>-*.json.
@@ -85,6 +86,14 @@ for (const w of workflows) {
     const last = full.calls.at(-1);
     if (!last || last.model !== 'opus') full.problems.push(`last agent is ${last && last.label} on ${last && last.model}, not the adversary on opus`);
     const sparse = await runOnce(w, args, 'sparse');
+    // Profiles: every profile runs clean, and 'max' puts the last agent (the adversary) at max unless the example pins it.
+    for (const profile of ['quick', 'deep', 'max']) {
+      const r = await runOnce(w, { ...args, profile }, 'full');
+      r.problems.forEach(p => full.problems.push(`profile ${profile}: ${p}`));
+      if (profile === 'max' && r.calls.at(-1)?.effort !== 'max' && !JSON.stringify(args).includes('"effort"')) full.problems.push(`profile max left the adversary at ${r.calls.at(-1)?.effort}`);
+    }
+    const bad = await runOnce(w, { ...args, profile: 'turbo' }, 'full');
+    if (!bad.problems.some(p => /profile must be one of/.test(p))) full.problems.push('an unknown profile was not rejected');
     const nulls = [];
     for (let k = 0; k < full.calls.length; k++) {
       const r = await runOnce(w, args, 'full', k);
