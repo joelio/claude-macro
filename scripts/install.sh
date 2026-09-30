@@ -18,7 +18,9 @@ run() { if [ $CHECK = 1 ]; then todo "$*"; else echo "  run   $*"; "$@" || { ech
 echo "Prerequisites"
 # claude is often a shell alias to a local install, which scripts cannot see; CLAUDE_BIN overrides.
 CLAUDE=${CLAUDE_BIN:-$(command -v claude || true)}; [ -z "$CLAUDE" ] && [ -x "$HOME/.claude/local/claude" ] && CLAUDE="$HOME/.claude/local/claude"
-[ -n "$CLAUDE" ] && ok "claude $("$CLAUDE" --version 2>/dev/null | head -1)" || { echo "  FAIL  Claude Code CLI not found (set CLAUDE_BIN): https://docs.claude.com/en/docs/claude-code"; exit 1; }
+[ -n "$CLAUDE" ] || { echo "  FAIL  Claude Code CLI not found (set CLAUDE_BIN): https://docs.claude.com/en/docs/claude-code"; exit 1; }
+if ver=$("$CLAUDE" --version 2>&1) && [ -n "$ver" ]; then ok "claude $(echo "$ver" | head -1)"
+else echo "  FAIL  $CLAUDE does not run: $(echo "$ver" | head -1)"; echo "        fix Claude Code first (for a local install: cd ~/.claude/local && node node_modules/@anthropic-ai/claude-code/install.cjs)"; exit 1; fi
 if command -v node >/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ]; then ok "node $(node -v)"; else echo "  FAIL  node 18+ is required"; exit 1; fi
 
 echo "Skill"
@@ -41,6 +43,7 @@ add_mcp() { # name url [header]
   if [ -n "$hdr" ]; then run "$CLAUDE" mcp add --scope user --transport http "$name" "$url" --header "$hdr"
   else run "$CLAUDE" mcp add --scope user --transport http "$name" "$url"; fi
 }
+if [ $UPDATE = 1 ] && ! "$CLAUDE" mcp list >/dev/null 2>&1; then echo "  FAIL  cannot read MCP config; not changing anything"; exit 1; fi
 if [ $UPDATE = 1 ] && [ -z "${EXA_API_KEY:-}" ] && "$CLAUDE" mcp get exa 2>/dev/null | grep -q exaApiKey; then
   echo "  WARN  your exa server has an API key but EXA_API_KEY is not set; set it first or the key is lost"; exit 1
 fi
