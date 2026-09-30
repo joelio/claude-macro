@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `examples/verify-agent-config.json` audits a repo's Claude Code permissions, hooks and MCP servers, with a least-privilege attack. The web-perf verify example uses `attacks[].groups`. LESSONS records the measured slim-payload saving: 14%, or 29% with `groups`.
+
 - The eval (`evals/`): 4 tasks with answer keys (planted-report, clean-report, cluck-docs, debug-22), deterministic graders that `npm test` self-tests, a single-agent baseline for arms A and C, and blind trial preparation. Real macro output from dogfood runs 1 and 2 already grades as passing: cluck-docs 5/5, debug-22 2/2.
 - The improve loop allows the forms of `npm test` a model actually runs, and the prompt says to run commands plainly (three items were blocked in its first run).
 

@@ -31,11 +31,20 @@
   "attacks": [
     {
       "key": "caching",
-      "prompt": "Target: cache fingerprinted assets for a year and call it the biggest win. Security, operational and benefit arguments against."
+      "prompt": "Target: cache fingerprinted assets for a year and call it the biggest win. Security, operational and benefit arguments against.",
+      "groups": [
+        "http-caching",
+        "security-guidance"
+      ]
     },
     {
       "key": "lazy-js",
-      "prompt": "Target: lazy controller loading and on-demand library loaders. Old-browser shims, flash of unenhanced content, serial load chains, test coverage, cheaper alternatives."
+      "prompt": "Target: lazy controller loading and on-demand library loaders. Old-browser shims, flash of unenhanced content, serial load chains, test coverage, cheaper alternatives.",
+      "groups": [
+        "js-platform",
+        "libraries",
+        "codebase"
+      ]
     }
   ],
   "workDir": "<HOME>/.local/share/macro/<project>/<runId>-verify",

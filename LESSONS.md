@@ -20,6 +20,8 @@ Traps that cost time, and how the agents did. Stack-specific traps live with the
 
 - **dontAsk matches Bash commands as written.** In the loop's first run, three of seven items were blocked because the worker ran `npm test` with pipes or flags that no allow rule matched, so its own gate was refused. Allow the forms a model really uses (`Bash(npm test:*)`), and say in the prompt to run commands plainly.
 
+- **The slim adversary payload saves less than estimated.** On 61 synthetic verdicts shaped like the cluck run, the full payload is 19.9k characters, the slim view 17.1k (14% smaller), and slim with an attack limited to one group 14.0k (29% smaller). That's short of the 43% estimated in v0.2, because quotes are now kept on confirmed measured and code claims, which is most of a codebase check. Accuracy won over the saving; `attacks[].groups` is the lever that still pays.
+
 ## Sources and tools
 
 - Exa's free tier rate-limits a parallel fan-out within minutes. Set `EXA_API_KEY` before `scripts/install.sh`. Otherwise agents fall back to curl of primary sources: RFC text, `chromium.googlesource.com/...?format=TEXT` (base64), raw GitHub at a tag.

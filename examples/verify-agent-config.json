@@ -1,0 +1,38 @@
+{
+  "target": "The Claude Code agent configuration of the repo at <REPO>: .claude/settings.json, .claude/settings.local.json if present, .mcp.json, hooks and the scripts they run, and any CLAUDE.md or AGENTS.md instructions that grant or restrict tools.",
+  "context": "Read-only review of how much an agent working in this repo is allowed to do, and whether that matches what the repo needs.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-agent-config",
+  "rules": "Read-only. Never run the hooks or MCP servers; read their code. Don't print secret values: name the setting, not the value.",
+  "groups": [
+    {
+      "key": "settings",
+      "prompt": "Every permission rule (allow, ask, deny), the default mode and additionalDirectories: what each allows, checked against the Claude Code settings docs (context7). Flag broad rules such as Bash(*), Read(**) outside the repo, or bypass modes."
+    },
+    {
+      "key": "hooks",
+      "prompt": "Every hook: its event, matcher, the command it runs, and what that command can do. Flag hooks that run network calls, write outside the repo, or could be steered by tool input."
+    },
+    {
+      "key": "mcp",
+      "prompt": "Every MCP server: transport, where its credentials come from (header, URL, env, headersHelper), which tools it exposes, and whether any key appears in plain text in config."
+    },
+    {
+      "key": "permissions",
+      "effort": "low",
+      "prompt": "Tabulate what an agent can do here without a prompt: tools, paths, commands and network, as a least-privilege inventory."
+    }
+  ],
+  "logic": {
+    "prompt": "Do the permissions match what the repo's workflows and CLAUDE.md actually need? Name anything granted but unused."
+  },
+  "attacks": [
+    {
+      "key": "least-privilege",
+      "groups": [
+        "permissions",
+        "settings"
+      ],
+      "prompt": "Target: the claim that this configuration is least-privilege. Argue against it: prompt injection through fetched or repo content reaching an allowed tool, compound Bash commands, reads of secrets via allowed tools, and hooks as an escalation path."
+    }
+  ]
+}

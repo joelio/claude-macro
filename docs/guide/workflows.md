@@ -126,7 +126,7 @@ The logic review always runs, even with no `attacks`. It works from the groups' 
 | `logic` | no | `{ prompt?, model?, effort? }`; extra instructions for the logic review, which runs regardless |
 | `inventory`, `quoteCheck` | no | Both default on; `false` skips the stage |
 | `recheck` | no | Default off. When on, a mechanical agent re-opens the citations behind the adversaries' blocker and serious objections and their safe claims, after the attack |
-| `attacks` | no | `[{ key, prompt, effort?, groups? }]`, one per recommendation. `groups` must name existing group keys |
+| `attacks` | no | `[{ key, prompt, effort?, groups? }]`, one per recommendation. `groups` must name existing group keys; it cuts that attacker's input by about 29% when limited to one of four groups, and every other group's claims still arrive without quotes |
 | `workerModel`, `attackModel` | no | Defaults `sonnet` and `opus` |
 | `rules`, `tools`, `profile` | no | As above |
 
