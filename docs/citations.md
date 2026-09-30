@@ -44,6 +44,10 @@ A tag stronger than the evidence is a defect. Grep counts are `code`, not `measu
   - Gems and packages: read the installed copy and cite its path and version.
 - Save fetched sources under the work directory so a reviewer can re-check the quote offline.
 
+## Quote check
+
+`investigate` and `verify` run a mechanical quote check before the adversary. It finds each quote in its saved source, in the file at the named commit, or at the URL. Its results are `found`, `wrong-line`, `not-found` or `source-missing`; a missing source is reported, never counted as found. A claim whose quote wasn't found can't support a safe claim. This catches both quotes a model made up and text injected through a fetched page.
+
 ## Verdicts
 
 Verification agents return one of `confirmed`, `partly`, `wrong`, `unverifiable`, with the exact corrected wording when not confirmed. A report is updated from the corrections, and the counts go into the report's method section ("123 claims: 68 confirmed, 47 partly, 5 wrong, 3 unverifiable").

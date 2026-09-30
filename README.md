@@ -26,8 +26,8 @@ The installer needs Claude Code, Node 18 or later and git. It links the skill, a
 
 | Workflow | Use it when | Shape | Agents |
 |---|---|---|---|
-| `investigate` | You need to understand a problem or ticket before deciding anything | 4-6 evidence streams, then an Opus sceptic that re-checks findings by id and names gaps and alternatives | streams + 1 |
-| `verify` | A report, README, PR or set of claims is about to go to other people | Claim groups with quote-required verdicts, then an Opus logic review and one attacker per recommendation | groups + 1 + attacks |
+| `investigate` | You need to understand a problem or ticket before deciding anything | 4-6 evidence streams, a quote check, then an Opus sceptic that re-checks findings by id and names gaps and alternatives | streams + 2 |
+| `verify` | A report, README, PR or set of claims is about to go to other people | An inventory of every claim, claim groups with quote-required verdicts, a quote check, then an Opus logic review and one attacker per recommendation | groups + 3 + attacks |
 | `change-evidence` | A change is committed locally and needs proof before or alongside a draft PR | Parallel checks, an optional clean benchmark, then an Opus challenger that writes the safe claims and verification steps | checks + benchmark + 1 |
 | `debug` | A bug, crash, flaky test or regression whose cause is not known | Reproduce plus competing hypotheses, parallel attempts to falsify each, then an Opus adjudicator with a cited cause-to-symptom chain | 2 + hypotheses + 1 |
 | `decide` | A choice between options, or a dependency upgrade | Evidence per option against fixed criteria, then an Opus attack on the leader and a ranking | options + shared + 1 |

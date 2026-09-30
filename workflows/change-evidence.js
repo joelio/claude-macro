@@ -6,6 +6,7 @@ export const meta = {
     { title: 'Check', detail: 'correctness, build, size, platform checks in parallel', model: 'sonnet' },
     { title: 'Benchmark', detail: 'runs alone so timings are clean', model: 'sonnet' },
     { title: 'Challenge', detail: 'adversarial review, safe claims, verification steps', model: 'opus' },
+    { title: 'Recheck', detail: 'optional: re-open the challenger\'s citations', model: 'sonnet' },
   ],
 }
 
@@ -17,6 +18,7 @@ export const meta = {
 //   checks: [{ key, prompt, effort? }],               // effort defaults to the profile's worker effort; 'low' for mechanical checks
 //   benchmark?: { prompt, kind?, effort? },           // kind: 'process' (default) | 'browser' | 'device' | 'gpu'; omit when timing is not the question
 //   qaAudience?: 'who verifies and with what',        // default: the developer, locally
+//   recheck?: false,                               // mechanical re-check of the challenger's objections and safe claims
 //   workerModel?: 'sonnet', reviewModel?: 'opus', reviewEffort?: 'high'
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
@@ -96,6 +98,30 @@ const usage = results => {
   if (over.length) { log(`over the shared limits: ${over.join('; ')}`) }
   return { limits: A.budgets || null, used, over }
 }
+// Quote check: a mechanical pass over every citation before the adversary (off with args.quoteCheck = false). It
+// finds each quote in its source and reports found, wrong-line, not-found or source-missing. A missing source is
+// reported, never folded into a pass. quoteRefs() caps the list at 120 refs and logs what it dropped.
+const QC = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: {
+  ref: { type: 'string' },
+  status: { type: 'string', enum: ['found', 'found-normalised', 'wrong-line', 'not-found', 'source-missing'] },
+  located_at: { type: 'string' } }, required: ['ref', 'status', 'located_at'] } } }, required: ['results'] }
+const quoteRefs = items => {
+  const refs = items.flatMap(it => (it.citations || []).map((c, k) => ({ ref: `${it.id}.${k}`, source: c.source, quote: c.quote })))
+  if (refs.length > 120) { log(`quote check: ${refs.length - 120} of ${refs.length} citations not checked (cap 120)`) }
+  return refs.slice(0, 120)
+}
+const QUOTE_TASK = 'Task "quote-check", mechanical; do not judge claims. For each ref, find the quote verbatim in its source: the saved copy under the work dir if there is one, the file at the named commit for file:line sources, or the URL (fetch it once) otherwise. Normalise only whitespace and ellipses. For file:line sources the quote must be within 3 lines of the cited line, else wrong-line. If the source cannot be found or fetched, report source-missing; never count it as found.'
+const quoteStatus = qc => {
+  const bad = new Map()
+  for (const r of ((qc && qc.results) || [])) { if (!['found', 'found-normalised'].includes(r.status)) { bad.set(r.ref.replace(/\.\d+$/, ''), r.status) } }
+  return bad
+}
+// Recheck (optional, args.recheck = true): a mechanical pass after the adversary that re-opens the citations behind
+// its blocker and serious objections and its safe claims, and says whether each holds.
+const RECHECK = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: {
+  item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
+  evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
+const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
 // --- end shared ---
 
 uniqueKeys(A.checks, 'check')
@@ -162,6 +188,14 @@ EVIDENCE:
 ${JSON.stringify(all)}`, { label: 'challenge', phase: 'Challenge', model: A.reviewModel || 'opus', effort: A.reviewEffort || E.judge, schema: withUsed(CHALLENGE) })
 if (challenge) { challenge.objections = demote(challenge.objections) } else { not_run.push('challenge') }
 
+let recheck = null
+if (A.recheck && challenge) {
+  phase('Recheck'); mark('Recheck')
+  const items = [...challenge.claims_safe_for_pr, ...challenge.objections.filter(o => ['blocker', 'serious'].includes(o.severity))]
+  recheck = await agent(`${BASE}\n\n${RECHECK_TASK}\n\nITEMS:\n${JSON.stringify(items)}\n\nEVIDENCE:\n${JSON.stringify(all)}`,
+    { label: 'recheck', phase: 'Recheck', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(RECHECK) })
+  if (!recheck) { not_run.push('recheck') }
+}
 mark('end')
 if (not_run.length) { log(`not run: ${not_run.join(', ')}`) }
-return { spent: phaseTokens(), usage: usage([...all, ...[challenge]]), not_run, evidence: all, challenge }
+return { spent: phaseTokens(), usage: usage([...all, challenge, recheck]), not_run, evidence: all, challenge, recheck }

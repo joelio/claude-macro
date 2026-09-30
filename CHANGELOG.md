@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A quote check (mechanical, Sonnet `low`) before the adversary in investigate and verify. A missing source is reported as `source-missing`, never a pass, and such claims can't support safe claims.
+- Verify's claims inventory: every checkable claim is assigned to exactly one group, and anything unchecked comes back as `missed`.
+- An optional `recheck` of the adversary's citations in verify and change-evidence.
+- The dry run tests the recheck path, and unit-checks `quoteStatus()`.
+
 - Backlog work:
   - Per-agent budgets: `args.budgets` is split across agents (80% to workers, 20% to adversaries), and `usage` sums what each agent reports and flags overruns.
   - `spent` is now per-phase output tokens rather than cumulative totals.

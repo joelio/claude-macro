@@ -41,5 +41,6 @@
   "workDir": "<HOME>/.local/share/macro/<project>/<runId>-verify",
   "logic": {
     "prompt": "Premises and conclusions for each recommendation: hidden assumptions, overgeneralisation, confounders (HTTP/2, Turbo, first visits, bfcache), missing alternatives, and evidence tags stated more strongly than the evidence."
-  }
+  },
+  "inventory": false
 }

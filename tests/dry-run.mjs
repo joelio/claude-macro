@@ -60,7 +60,10 @@ async function runOnce(w, args, mode, nullAt = -1) {
 {
   const src = fs.readFileSync(path.join(root, 'workflows', `${workflows[0]}.js`), 'utf8');
   const shared = src.match(/\/\/ --- shared:[\s\S]*?\/\/ --- end shared ---/)[0];
-  const demote = new Function('A', 'budget', `${shared}\nreturn demote`)({}, { spent: () => 0 });
+  const { demote, quoteStatus } = new Function('A', 'budget', 'log', `${shared}\nreturn { demote, quoteStatus }`)({}, { spent: () => 0 }, () => {});
+  const qs = quoteStatus({ results: [{ ref: 'verify:c1.0', status: 'not-found' }, { ref: 'verify:c2.1', status: 'found' }, { ref: 's#3.0', status: 'source-missing' }] });
+  if (qs.get('verify:c1') !== 'not-found' || qs.has('verify:c2') || qs.get('s#3') !== 'source-missing') { console.log('FAIL quoteStatus(): failed quotes not mapped to claim ids'); process.exitCode = 1; }
+  else console.log('ok   quoteStatus() unit check');
   const out = demote([{ severity: 'blocker', citations: [] }, { severity: 'refuted' }, { severity: 'serious', citations: [{}] }, { severity: 'minor', citations: [] }]);
   const want = ['question', 'question', 'serious', 'minor'];
   if (out.map(o => o.severity).join() !== want.join()) { console.log(`FAIL demote(): got ${out.map(o => o.severity)}, want ${want}`); process.exitCode = 1; }
@@ -100,6 +103,9 @@ for (const w of workflows) {
     tight.problems.forEach(p => full.problems.push(`budgets: ${p}`));
     if (!(tight.out && tight.out.usage && tight.out.usage.over.length)) full.problems.push('a shared-limit overrun was not reported in usage.over');
     if (!tight.prompts.every(p => p.includes('Shared limits for this run'))) full.problems.push('not every prompt states the shared-limit shares');
+    // Optional recheck stage (verify, change-evidence): must run clean; the agent limit doesn't apply, since the user asked for it.
+    const rc = await runOnce(w, { ...args, recheck: true }, 'full');
+    rc.problems.filter(p => !/agents; the limit/.test(p)).forEach(p => full.problems.push(`recheck: ${p}`));
     const bad = await runOnce(w, { ...args, profile: 'turbo' }, 'full');
     if (!bad.problems.some(p => /profile must be one of/.test(p))) full.problems.push('an unknown profile was not rejected');
     const nulls = [];

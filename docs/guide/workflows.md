@@ -40,9 +40,12 @@ Do not use it when you already have a hypothesis to test (`debug`), a finished w
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
 | Measure | one per stream, in parallel | `streams[].model`, else `workerModel`, else `sonnet` | `streams[].effort`, else work |
+| Quotes | the quote check (skip with `quoteCheck: false`) | `workerModel`, else `sonnet` | `low` |
 | Challenge | the sceptic | `sceptic.model`, else `opus` | `sceptic.effort`, else judge |
 
-The sceptic first lists the sub-questions the topic implies and marks which no stream answered. Then it re-checks findings by id: at least `minClaims` of them (default 12, capped at the number of findings), and every measured or code finding the decision depends on. `upheld` needs its own re-check to reproduce the finding, with a citation; without one the script records `untestable`. It names one alternative explanation per headline finding, flags contradictions between streams, and writes the safe claims.
+The quote check finds each citation's quote in its source (the saved copy, the file at the commit, or the URL) and marks findings whose quote wasn't found (`quote_check: not-found`, `wrong-line` or `source-missing`). A missing source is reported, never counted as found. The sceptic re-checks those before upholding them.
+
+The sceptic first lists the sub-questions the topic implies and marks which no stream answered. Then it re-checks findings by id: at least `minClaims` of them (default 12, capped at the number of findings), and every measured or code finding the decision depends on. `upheld` needs its own re-check to reproduce the finding, with a citation; without one the script records `untestable`. It names one alternative explanation per headline finding, flags contradictions between streams, and writes the safe claims. A safe claim may rest on upheld findings, or on weakened ones in their corrected form, marked `rests_on_corrected`.
 
 ### Args
 
@@ -105,7 +108,9 @@ Do not use it to gather new evidence about a system; that is `investigate`. Do n
 
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
-| Verify | one per group, in parallel | `groups[].model`, else `workerModel`, else `sonnet` | `groups[].effort`, else work |
+| Inventory | one agent lists every checkable claim and assigns each to exactly one group (skip with `inventory: false`) | `workerModel`, else `sonnet` | `low` |
+| Verify | one per group, in parallel; each must return a verdict for every claim it was given | `groups[].model`, else `workerModel`, else `sonnet` | `groups[].effort`, else work |
+| Quotes | the quote check (skip with `quoteCheck: false`) | `workerModel`, else `sonnet` | `low` |
 | Attack | the logic review, plus one attacker per entry in `attacks`, in parallel | logic: `logic.model`, else `attackModel`, else `opus`; attackers: `attackModel`, else `opus` | logic: `logic.effort`, else judge; attackers: `attacks[].effort`, else judge |
 
 The logic review always runs, even with no `attacks`. It works from the groups' verdicts: for each conclusion in the target, its premises and their verdicts, whether it follows, hidden assumptions, confounders, missing alternatives, and tags stronger than the evidence. Each attacker argues against one recommendation as hard as it honestly can. Attackers and the logic review get a slim view of the verdicts: quotes stay where a wrong one would matter (disputed claims, and confirmed measured or code claims), other confirmed claims keep only their sources. An attack's `groups` limits which groups it sees with quotes; it still sees the rest without them.
@@ -119,6 +124,8 @@ The logic review always runs, even with no `attacks`. It works from the groups' 
 | `workDir` | yes | Absolute directory for fetched sources and raw data |
 | `groups` | yes | `[{ key, prompt, model?, effort? }]`, for example specs, security, platform, codebase, data. A group may not be keyed `logic` |
 | `logic` | no | `{ prompt?, model?, effort? }`; extra instructions for the logic review, which runs regardless |
+| `inventory`, `quoteCheck` | no | Both default on; `false` skips the stage |
+| `recheck` | no | Default off. When on, a mechanical agent re-opens the citations behind the adversaries' blocker and serious objections and their safe claims, after the attack |
 | `attacks` | no | `[{ key, prompt, effort?, groups? }]`, one per recommendation. `groups` must name existing group keys |
 | `workerModel`, `attackModel` | no | Defaults `sonnet` and `opus` |
 | `rules`, `tools`, `profile` | no | As above |
@@ -146,15 +153,18 @@ Four agents. The pack example `packs/web-perf/examples/verify-report.json` adds 
 ### What comes back
 
 ```
-{ spent, usage, not_run, counts, verified, logic, attacks }
+{ spent, usage, not_run, counts, inventory, missed, quotes, verified, logic, attacks, recheck }
 ```
 
+- `inventory.claims[]` and `missed[]`: every checkable claim the inventory found, and those no group returned a verdict for. The logic review sees `missed` as never verified.
+- `quotes`: the quote check's per-citation status; claims whose quote wasn't found carry `quote_check` and can't support a safe claim.
+- `recheck`: when on, `holds`, `contradicted` or `unsupported` per adversary item. A contradicted item is for you to decide, not an automatic reversal.
 - `counts`: claims by verdict, for example `{ confirmed: 43, partly: 14, unverifiable: 4 }`. That line goes into the report's Method section.
 - `verified[]`: per group, its `claims[]` and `new_facts[]`. Each claim has an `id` (`<group>:<where in the target>`), the `claim`, a `verdict`, a `kind` tag for how the verdict is known, a `correction` with the exact wording when not confirmed, and `citations`.
 - `logic.conclusions[]`: each with `premises[]` (each premise's `claim_ids` and `status`), `follows` (`yes`, `partly`, `no`), `objections[]` and `revised`, the conclusion the evidence supports. Plus `missing_alternatives[]` and `claims_safe_for_pr[]`.
 - `attacks[]`: per attack, `objections[]`, `survives` (true or false) and `revised_recommendation`.
 
-Reading the verdicts: `confirmed` needs a citation; a confirmed verdict without one is recorded as `unverifiable` with `demoted_from: confirmed`. `partly` and `wrong` come with the corrected wording. A conclusion whose premises include a `wrong` or `unverifiable` claim is unsupported, and `follows` says so. Safe claims are filtered after the attacks: only those resting on confirmed verdicts survive, and while any attack has a blocker or serious objection standing, every surviving claim is marked `contested_by` that attack. In the cluck run, the guide's "five minutes" promise came back `follows: no` and the redaction recommendation `survives: false`.
+Reading the verdicts: `confirmed` needs a citation; a confirmed verdict without one is recorded as `unverifiable` with `demoted_from: confirmed`. `partly` and `wrong` come with the corrected wording. A conclusion whose premises include a `wrong` or `unverifiable` claim is unsupported, and `follows` says so. Safe claims are filtered after the attacks: only those resting on confirmed verdicts whose quotes were found survive. A claim is marked `contested_by` an attack with a standing blocker or serious objection only if it rests on a group that attack read, or an objection names one of its ids. In the cluck run, the guide's "five minutes" promise came back `follows: no` and the redaction recommendation `survives: false`.
 
 ## change-evidence
 
@@ -173,6 +183,7 @@ Do not use it on an uncommitted diff, or when the question is still "what should
 | Check | one per check, in parallel | `workerModel`, else `sonnet` | `checks[].effort`, else work |
 | Benchmark | one, only if `benchmark` is given; it runs alone so timings are clean | `workerModel`, else `sonnet` | `benchmark.effort`, else work |
 | Challenge | the reviewer | `reviewModel`, else `opus` | `reviewEffort`, else judge |
+| Recheck | optional (`recheck: true`): re-opens the citations behind the reviewer's blocker and serious objections and its safe claims | `workerModel`, else `sonnet` | `low` |
 
 The benchmark agent gets design rules by `kind`: `process` (hyperfine or equivalent, warm-ups discarded, fresh process per run), `browser` (fresh browser process per run), `device` (n boots or cycles on the same power source, timestamps from the serial log, one test at a time) or `gpu` (discard first runs, pin clocks, record driver and firmware versions). All kinds interleave arms in a seeded shuffle, n of at least 20 per arm per condition, and report median, IQR, min-max and a bootstrap 95% CI of the median difference.
 
@@ -188,6 +199,7 @@ In the change's worktree, agents may create only build output that git ignores.
 | `checks` | yes | `[{ key, prompt, effort? }]`; `low` for mechanical checks |
 | `benchmark` | no | `{ prompt, kind?, effort? }`; `kind` is `process` (default), `browser`, `device` or `gpu`. Omit when timing is not the question |
 | `qaAudience` | no | Who verifies and with what; default "the developer, locally" |
+| `recheck` | no | Default off; see Stages |
 | `workerModel`, `reviewModel`, `reviewEffort` | no | Defaults `sonnet`, `opus`, judge |
 | `rules`, `tools`, `profile` | no | As above |
 
@@ -213,7 +225,7 @@ Three agents. The pack example `packs/web-perf/examples/change-evidence-minified
 ### What comes back
 
 ```
-{ spent, usage, not_run, evidence, challenge }
+{ spent, usage, not_run, evidence, challenge, recheck }
 ```
 
 - `evidence[]`: one entry per check plus the benchmark, each with `method`, `results[]`, `numbers_table`, `risks[]` and `raw_paths[]`. Each result has an `id` (`<check>#<n>`), a `kind` tag, `citations`, and a `bearing`: `supports-change`, `neutral`, `against-change` or `blocker`. The worker rates bearing; the reviewer decides.

@@ -3,8 +3,11 @@ export const meta = {
   description: 'Check every claim in a report or change against cited primary sources, then a logic review and attackers work from the verdicts',
   whenToUse: 'Before a report or PR goes to other people: confirm, correct and cite every claim',
   phases: [
+    { title: 'Inventory', detail: 'list every checkable claim and assign each to one group', model: 'sonnet' },
     { title: 'Verify', detail: 'one agent per claim group, quotes required', model: 'sonnet' },
+    { title: 'Quotes', detail: 'mechanical check that every quote is in its source', model: 'sonnet' },
     { title: 'Attack', detail: 'logic review plus one attacker per recommendation, all given the verdicts', model: 'opus' },
+    { title: 'Recheck', detail: 'optional: re-open the adversaries\' citations', model: 'sonnet' },
   ],
 }
 
@@ -16,6 +19,8 @@ export const meta = {
 //   groups: [{ key, prompt, model?, effort? }],      // e.g. specs, security, platform, codebase, data; defaults workerModel, 'medium'
 //   logic?: { prompt?, model?, effort? },           // always runs after the groups; defaults 'opus', 'high'
 //   attacks?: [{ key, prompt, effort?, groups? }],  // one per recommendation; groups limits which verdicts it reads (all by default)
+//   inventory?: true,                             // one agent lists every claim and assigns it to a group; false to skip
+//   quoteCheck?: true, recheck?: false,           // mechanical quote check before the attack; recheck of the adversaries after
 //   workerModel?: 'sonnet', attackModel?: 'opus'
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
@@ -99,6 +104,30 @@ const usage = results => {
   if (over.length) { log(`over the shared limits: ${over.join('; ')}`) }
   return { limits: A.budgets || null, used, over }
 }
+// Quote check: a mechanical pass over every citation before the adversary (off with args.quoteCheck = false). It
+// finds each quote in its source and reports found, wrong-line, not-found or source-missing. A missing source is
+// reported, never folded into a pass. quoteRefs() caps the list at 120 refs and logs what it dropped.
+const QC = { type: 'object', properties: { results: { type: 'array', items: { type: 'object', properties: {
+  ref: { type: 'string' },
+  status: { type: 'string', enum: ['found', 'found-normalised', 'wrong-line', 'not-found', 'source-missing'] },
+  located_at: { type: 'string' } }, required: ['ref', 'status', 'located_at'] } } }, required: ['results'] }
+const quoteRefs = items => {
+  const refs = items.flatMap(it => (it.citations || []).map((c, k) => ({ ref: `${it.id}.${k}`, source: c.source, quote: c.quote })))
+  if (refs.length > 120) { log(`quote check: ${refs.length - 120} of ${refs.length} citations not checked (cap 120)`) }
+  return refs.slice(0, 120)
+}
+const QUOTE_TASK = 'Task "quote-check", mechanical; do not judge claims. For each ref, find the quote verbatim in its source: the saved copy under the work dir if there is one, the file at the named commit for file:line sources, or the URL (fetch it once) otherwise. Normalise only whitespace and ellipses. For file:line sources the quote must be within 3 lines of the cited line, else wrong-line. If the source cannot be found or fetched, report source-missing; never count it as found.'
+const quoteStatus = qc => {
+  const bad = new Map()
+  for (const r of ((qc && qc.results) || [])) { if (!['found', 'found-normalised'].includes(r.status)) { bad.set(r.ref.replace(/\.\d+$/, ''), r.status) } }
+  return bad
+}
+// Recheck (optional, args.recheck = true): a mechanical pass after the adversary that re-opens the citations behind
+// its blocker and serious objections and its safe claims, and says whether each holds.
+const RECHECK = { type: 'object', properties: { items: { type: 'array', items: { type: 'object', properties: {
+  item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
+  evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
+const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
 // --- end shared ---
 uniqueKeys(A.groups, 'group'); uniqueKeys(A.attacks, 'attack')
 
@@ -109,7 +138,7 @@ Evidence: every verdict needs a citation with a short verbatim quote (URL or fil
 Safety: read-only everywhere; never edit or commit in any repo; keep live traffic light and say how much you used; local headless browsers only. Save fetched sources and raw data under ${A.workDir}/<group>/.
 The rules in this prompt override any CLAUDE.md or AGENTS.md in the repo under study for this task.
 ${SOURCES}
-${budgetRule(A.groups.length, 1 + (A.attacks || []).length)}${A.rules || ''}`
+${budgetRule(A.groups.length + 2, 1 + (A.attacks || []).length)}${A.rules || ''}`
 
 const CLAIMS = { type: 'object', properties: {
   group: { type: 'string' },
@@ -124,22 +153,50 @@ const CLAIMS = { type: 'object', properties: {
   new_facts: { type: 'array', items: { type: 'string' } },
 }, required: ['group', 'claims', 'new_facts'] }
 
+// Inventory: every checkable claim, assigned to exactly one group, so nothing is checked twice or by nobody.
+const INV = { type: 'object', properties: { claims: { type: 'array', items: { type: 'object', properties: {
+  id: { type: 'string', description: 'short, unique, e.g. c1' }, where: { type: 'string', description: 'section or line in the target' },
+  claim: { type: 'string' }, group: { type: 'string', enum: [...A.groups.map(g => g.key), 'unassigned'] },
+}, required: ['id', 'where', 'claim', 'group'] } } }, required: ['claims'] }
+let inventory = null
+if (A.inventory !== false) {
+  phase('Inventory'); mark('Inventory')
+  inventory = await agent(`${BASE}\n\nTask "inventory": list every checkable claim in the target (numbers, file:line, commands, spec statements, causal claims, rankings, recommendations). Give each a unique id and assign it to exactly one of these groups by topic: ${A.groups.map(g => `${g.key} (${g.prompt.slice(0, 120)})`).join('; ')}; use "unassigned" if none fits. Do not verify anything.`,
+    { label: 'inventory', phase: 'Inventory', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(INV) })
+}
+const assigned = k => ((inventory && inventory.claims) || []).filter(c => c.group === k)
+
 phase('Verify'); mark('Verify')
 const verified = (await parallel(A.groups.map(g => () =>
-  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}`, { label: `verify:${g.key}`, phase: 'Verify', model: g.model || A.workerModel || 'sonnet', effort: g.effort || E.work, schema: withUsed(CLAIMS) })
+  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}${inventory ? `\nYour claims (return a verdict for every id, keeping the id exactly; add any others you find in your topic with new ids):\n${JSON.stringify(assigned(g.key))}` : ''}`, { label: `verify:${g.key}`, phase: 'Verify', model: g.model || A.workerModel || 'sonnet', effort: g.effort || E.work, schema: withUsed(CLAIMS) })
     .then(r => r && { ...r, group: g.key, claims: (r.claims || []).map(c => ({ ...c, id: `${g.key}:${c.id}` }))
       // No quote, no "confirmed".
       .map(c => c.verdict === 'confirmed' && !(c.citations || []).length ? { ...c, verdict: 'unverifiable', demoted_from: 'confirmed' } : c) })
 ))).filter(Boolean)
-const not_run = A.groups.filter(g => !verified.some(v => v.group === g.key)).map(g => `verify:${g.key}`)
+const not_run = [...(A.inventory !== false && !inventory ? ['inventory'] : []), ...A.groups.filter(g => !verified.some(v => v.group === g.key)).map(g => `verify:${g.key}`)]
 const claims = verified.flatMap(g => g.claims)
 const counts = claims.reduce((n, c) => ({ ...n, [c.verdict]: (n[c.verdict] || 0) + 1 }), {})
 log(`${verified.length}/${A.groups.length} groups returned ${claims.length} claims: ${JSON.stringify(counts)}; ${uncited(claims)} without a citation`)
+// Claims the inventory listed that no group returned a verdict for.
+const seen = new Set(claims.map(c => c.id.split(':').slice(1).join(':')))
+const missed = ((inventory && inventory.claims) || []).filter(c => !seen.has(c.id))
+if (inventory) { log(`${missed.length} of ${inventory.claims.length} inventoried claims have no verdict`) }
+
+let quotes = null
+if (A.quoteCheck !== false) {
+  phase('Quotes'); mark('Quotes')
+  quotes = await agent(`${BASE}\n\n${QUOTE_TASK}\n\nREFS:\n${JSON.stringify(quoteRefs(claims))}`,
+    { label: 'quote-check', phase: 'Quotes', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(QC) })
+  if (!quotes) { not_run.push('quote-check') }
+}
+const badQuote = quoteStatus(quotes)
+for (const g of verified) { g.claims = g.claims.map(c => badQuote.has(c.id) ? { ...c, quote_check: badQuote.get(c.id) } : c) }
+if (quotes) { log(`quote check: ${badQuote.size} claims with a quote not found in its source`) }
 
 // Adversaries get a slim view. Quotes stay wherever a wrong one would matter: disputed claims and confirmed
 // measured or code claims. Confirmed sourced or inferred claims keep only their sources. An attack limited to
 // some groups still sees every other group's claims, without quotes.
-const slimClaim = (c, quotes) => ({ id: c.id, claim: c.claim, verdict: c.verdict, kind: c.kind,
+const slimClaim = (c, quotes) => ({ id: c.id, claim: c.claim, verdict: c.verdict, kind: c.kind, ...(c.quote_check ? { quote_check: c.quote_check } : {}),
   ...(c.verdict !== 'confirmed' ? { correction: c.correction } : {}),
   ...(quotes ? { citations: c.citations.map(x => ({ source: x.source, quote: x.quote })) } : { sources: c.citations.map(x => x.source) }) })
 const slim = (gs, only) => gs.map(g => ({ group: g.group, new_facts: g.new_facts, claims: g.claims.map(c =>
@@ -168,7 +225,7 @@ const ATTACK = { type: 'object', properties: {
 }, required: ['target', 'objections', 'survives', 'revised_recommendation'] }
 const L = A.logic || {}
 const [logic, ...attacks] = await parallel([
-  () => agent(`${BASE}\n\nLogic review, an adversary. ${L.prompt || ''}\nFor each conclusion or recommendation in the target: its premises and each premise's verdict from the results below; whether it follows; hidden assumptions, overgeneralisation, confounders, missing alternatives, and tags stronger than the evidence. A conclusion resting on a wrong or unverifiable premise is unsupported. In claims_safe_for_pr, supported_by lists claim ids exactly as given. ${ADVERSARY_RULES}\n\nVERIFICATION RESULTS (compact; open a source if you need the text of a confirmed claim):\n${JSON.stringify(slim(verified))}`,
+  () => agent(`${BASE}\n\nLogic review, an adversary. ${L.prompt || ''}\nFor each conclusion or recommendation in the target: its premises and each premise's verdict from the results below; whether it follows; hidden assumptions, overgeneralisation, confounders, missing alternatives, and tags stronger than the evidence. A conclusion resting on a wrong or unverifiable premise is unsupported. A claim with quote_check set had its quote not found in its source: treat it as uncited. MISSED claims were never verified. In claims_safe_for_pr, supported_by lists claim ids exactly as given. ${ADVERSARY_RULES}\n\nVERIFICATION RESULTS (compact; open a source if you need the text of a confirmed claim):\n${JSON.stringify(slim(verified))}${missed.length ? `\n\nMISSED (inventoried, no verdict):\n${JSON.stringify(missed)}` : ''}`,
     { label: 'logic', phase: 'Attack', model: L.model || A.attackModel || 'opus', effort: L.effort || E.judge, schema: withUsed(LOGIC) }),
   ...(A.attacks || []).map(t => () =>
     agent(`${BASE}\n\n${t.prompt}\nArgue AGAINST it as hard as you honestly can: security, operations, benefit, cheaper alternatives. ${ADVERSARY_RULES}\n\nVERIFICATION RESULTS (compact):\n${JSON.stringify(slim(verified, t.groups))}`,
@@ -182,7 +239,7 @@ if (logic) {
   logic.conclusions = logic.conclusions.map(c => ({ ...c, objections: demote(c.objections) }))
   // Logic wrote its safe claims without seeing the attacks. Keep only claims resting on confirmed verdicts, and
   // mark every claim contested while any attack has an uncited-proof blocker or serious objection standing.
-  const confirmed = new Set(claims.filter(c => c.verdict === 'confirmed').map(c => c.id))
+  const confirmed = new Set(claims.filter(c => c.verdict === 'confirmed' && !c.quote_check).map(c => c.id))
   // A claim is contested by an attack with a standing blocker or serious objection only if the claim rests on a
   // group that attack read, or an objection names one of the claim's ids.
   const standing = attacked.filter(a => a.objections.some(o => ['blocker', 'serious'].includes(o.severity)))
@@ -194,6 +251,14 @@ if (logic) {
     .map(c => { const by = standing.filter(a => hits(a, c)).map(a => a.target); return by.length ? { ...c, contested_by: by } : c })
   log(`${before - logic.claims_safe_for_pr.length} safe claims dropped (not resting on confirmed verdicts); ${logic.claims_safe_for_pr.filter(c => c.contested_by).length} contested`)
 }
+let recheck = null
+if (A.recheck) {
+  phase('Recheck'); mark('Recheck')
+  const items = [...(logic ? logic.claims_safe_for_pr : []), ...[logic, ...attacked].filter(Boolean).flatMap(a => (a.objections || (a.conclusions || []).flatMap(c => c.objections)).filter(o => ['blocker', 'serious'].includes(o.severity)))]
+  recheck = await agent(`${BASE}\n\n${RECHECK_TASK}\n\nITEMS:\n${JSON.stringify(items)}`,
+    { label: 'recheck', phase: 'Recheck', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(RECHECK) })
+  if (!recheck) { not_run.push('recheck') }
+}
 mark('end')
 if (not_run.length) { log(`not run: ${not_run.join(', ')}`) }
-return { spent: phaseTokens(), usage: usage([...verified, ...[logic, ...attacked]]), not_run, counts, verified, logic, attacks: attacked }
+return { spent: phaseTokens(), usage: usage([inventory, ...verified, quotes, ...[logic, ...attacked], recheck]), not_run, counts, inventory, missed, quotes, verified, logic, attacks: attacked, recheck }
