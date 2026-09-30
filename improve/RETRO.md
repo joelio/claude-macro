@@ -18,5 +18,5 @@ You are the retro for this repo's self-improvement loop. Your job is to turn rea
    - Add backlog items to the end of `improve/BACKLOG.md`, each naming its evidence.
    - Add a line under `## Unreleased` in `CHANGELOG.md`: `Retro <YYYY-MM-DD>: <n> runs read, <n> lessons, <n> items`.
    - Never edit workflows, scripts or tests in a retro.
-6. Commit: `git add -A && git commit -m "retro: <date>"`. Never push.
+6. Don't run git. The loop commits your changes if they touch only those three files.
 7. End with exactly one line: `RESULT: retro <n> runs, <n> lessons, <n> items`.

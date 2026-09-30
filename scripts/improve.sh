@@ -1,7 +1,7 @@
 #!/bin/bash
 # Bounded self-improvement loop, Ralph-style. Each iteration:
 #   1. a fresh headless Sonnet run (improve/PROMPT.md) takes the top item in improve/BACKLOG.md, researches
-#      lightly, implements it, passes `npm test` and commits locally;
+#      lightly, implements it and passes `npm test`; the script (never the model) commits it;
 #   2. the gate re-runs the checks from a pristine copy taken at start, so a worker cannot loosen them;
 #   3. a headless Opus run (improve/REVIEW.md, also from the pristine copy) keeps or reverts the commit.
 # Commits touching the loop's own gates (scripts/, tests/, package.json, improve/*.md except BACKLOG) are refused.
@@ -40,20 +40,20 @@ COMMON=(--permission-mode dontAsk --setting-sources project --max-budget-usd "$M
   --disallowedTools "Bash(git push:*)" "Read(~/.claude.json)" "Read(~/.claude/**)" "Read(~/.ssh/**)" "Read(~/.aws/**)" "Read(~/.config/**)" "Read(~/.netrc)")
 WORKER_TOOLS=("Read(./**)" "Edit(./**)" "Write(./**)" Glob Grep WebFetch "Bash(npm test)" "Bash(npm test --silent)"
   "Bash(node scripts/check-workflows.mjs)" "Bash(node tests/dry-run.mjs)" "Bash(node tests/dry-run.mjs --estimate:*)"
-  "Bash(git add -A)" "Bash(git commit -m:*)" "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(git checkout -- .)" "Bash(git clean -fd)" "Bash(ls:*)"
+  "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(ls:*)"
   mcp__exa__web_search_exa mcp__exa__web_fetch_exa mcp__exa__get_code_context_exa mcp__context7__resolve-library-id mcp__context7__query-docs)
 REVIEW_TOOLS=("Read(./**)" Glob Grep "Bash(npm test)" "Bash(npm test --silent)" "Bash(git show:*)" "Bash(git diff:*)" "Bash(git log:*)")
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=/dev/null/push-disabled-by-improve
 if [ $RETRO = 1 ]; then
   before=$(git rev-parse HEAD)
   out=$("$CLAUDE" -p "$(cat "$PRISTINE/improve/RETRO.md")" --model opus --effort high "${COMMON[@]}" \
-        --allowedTools "Read(./**)" "Read(~/.local/share/macro/**)" "Edit(./LESSONS.md)" "Edit(./improve/BACKLOG.md)" "Edit(./CHANGELOG.md)" Glob Grep \
-        "Bash(git add -A)" "Bash(git commit -m:*)" "Bash(git status:*)" "Bash(ls:*)" 2>&1 || true)
-  echo "$out" | grep '^RESULT:' | tail -1 || echo "no RESULT line: $(echo "$out" | tail -1 | cut -c1-200)"
+        --allowedTools "Read(./**)" "Read(~/.local/share/macro/**)" "Edit(./LESSONS.md)" "Edit(./improve/BACKLOG.md)" "Edit(./CHANGELOG.md)" Glob Grep "Bash(ls:*)" 2>&1 || true)
+  result=$(echo "$out" | grep '^RESULT:' | tail -1 || true); echo "  ${result:-no RESULT line: $(echo "$out" | tail -1 | cut -c1-200)}"
+  # The script commits, not the model: only the three files a retro may change, and only with a RESULT line.
+  if [ -n "$result" ] && [ -z "$(git status --porcelain | grep -Ev '^ ?M (LESSONS\.md|improve/BACKLOG\.md|CHANGELOG\.md)$')" ] && [ -n "$(git status --porcelain)" ]; then
+    git add LESSONS.md improve/BACKLOG.md CHANGELOG.md && git commit -qm "retro: $(date +%Y-%m-%d) (${result#RESULT: retro })"
+  elif [ -n "$(git status --porcelain)" ]; then echo "  retro changed files it may not, or gave no RESULT; discarding"; fi
   clean
-  if git diff --name-only "$before" HEAD | grep -Ev '^(LESSONS\.md|improve/BACKLOG\.md|CHANGELOG\.md)$' | grep -q .; then
-    echo "retro changed files it may not; reverting"; git reset -q --hard "$before"
-  fi
   git log --oneline "$START..HEAD"; exit 0
 fi
 echo "branch $(git branch --show-current), $N iterations, max \$$MAX_USD per run"
@@ -66,6 +66,10 @@ for i in $(seq 1 "$N"); do
   out=$("$CLAUDE" -p "$(cat "$PRISTINE/improve/PROMPT.md")" --model sonnet --effort medium "${COMMON[@]}" --allowedTools "${WORKER_TOOLS[@]}" 2>&1 || true)
   result=$(echo "$out" | grep '^RESULT:' | tail -1 || true)
   echo "  ${result:-no RESULT line; last output: $(echo "$out" | tail -1 | cut -c1-200)}"
+  # The script commits, not the model (the worker has no git write access).
+  if [[ "$result" == "RESULT: done"* ]] && [ -n "$(git status --porcelain)" ]; then
+    git add -A && git commit -qm "improve: ${result#RESULT: done }"
+  fi
   clean
   if [ "$(git rev-parse HEAD)" = "$before" ]; then
     [[ "$result" == "RESULT: blocked"* ]] && block "${result#RESULT: blocked }"
