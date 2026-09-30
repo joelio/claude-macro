@@ -13,7 +13,9 @@ CHECK=0; UPDATE=0; PACKS=()
 while [ $# -gt 0 ]; do case $1 in --check) CHECK=1;; --update-mcp) UPDATE=1;; --pack) PACKS+=("${2:?--pack needs a name}"); shift;; --no-harness) ;; *) echo "unknown option $1"; exit 2;; esac; shift; done
 EXA_TOOLS=web_search_exa,web_fetch_exa,get_code_context_exa,crawling_exa
 ok() { echo "  ok    $*"; }; todo() { echo "  todo  $*"; missing=1; }; missing=0
-run() { if [ $CHECK = 1 ]; then todo "$*"; else echo "  run   $*"; "$@" || { echo "  FAIL  $*"; missing=1; }; fi; }
+# Never print secrets: mask API keys in URLs and header values when echoing commands.
+mask() { sed -E 's/(exaApiKey=|[Aa][Pp][Ii]_?[Kk][Ee][Yy][=:] ?)[^& "]+/\1<redacted>/g'; }
+run() { if [ $CHECK = 1 ]; then todo "$(echo "$*" | mask)"; else echo "  run   $(echo "$*" | mask)"; ( set -o pipefail; "$@" 2>&1 | mask ) || { echo "  FAIL  $(echo "$*" | mask)"; missing=1; }; fi; }
 
 echo "Prerequisites"
 # claude is often a shell alias to a local install, which scripts cannot see; CLAUDE_BIN overrides.
