@@ -11,6 +11,7 @@
   - one-question-at-a-time arg scoping in the skill (grill-me);
   - a verification walk-through that writes `UAT.md` (GSD verify-work);
   - an escalation ladder in the loop prompt (PUA's method, without the pressure).
+- Retro 2026-09-30: 1 runs read, 0 lessons, 0 items
 
 ## v0.2.0
 
