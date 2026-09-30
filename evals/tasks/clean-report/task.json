@@ -12,11 +12,11 @@
     {
      "key": "numbers",
      "effort": "low",
-     "prompt": "Re-derive every number from data.csv and the report's own tables: counts, totals, percentages, per-km\u00b2 figures, ratios and review hours."
+     "prompt": "Check every number in the report against data.csv and the report's own tables."
     },
     {
      "key": "method",
-     "prompt": "Check every statistical and method statement: the interval (name the method that gives it), the p-values against the stated null and number of draws, and whether the text matches the tables."
+     "prompt": "Check every statistical and method statement in the report."
     }
    ]
   }
