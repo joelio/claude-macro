@@ -17,7 +17,7 @@ CLAUDE=${CLAUDE_BIN:-$(command -v claude || true)}; [ -z "$CLAUDE" ] && [ -x "$H
 [ -n "$CLAUDE" ] || { echo "claude CLI not found; set CLAUDE_BIN"; exit 1; }
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean; commit or stash first"; exit 1; }
 npm test --silent >/dev/null || { echo "npm test fails before starting; fix that first"; exit 1; }
-if [ "$(git branch --show-current)" = main ]; then git switch -q -c "improve/$(date +%Y%m%d-%H%M)"; fi
+if [ "$(git branch --show-current)" = main ]; then git switch -q -c "improve/$(date +%Y%m%d-%H%M%S)" || { echo "cannot create the improve branch"; exit 1; }; fi
 START=$(git rev-parse HEAD)
 
 # Pristine gate: checks, tests and prompts as they were at start.
