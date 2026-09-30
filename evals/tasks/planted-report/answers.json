@@ -1,0 +1,115 @@
+{
+ "kind": "claims",
+ "planted": [
+  {
+   "id": "P1",
+   "what": "Wald interval labelled 95% (Wilson 75.5-94.9)",
+   "where": "interval|\\bCI\\b|confidence",
+   "fix": "wilson|clopper|wald|75\\.5|94\\.9|normal.approx"
+  },
+  {
+   "id": "P2",
+   "what": "'four' areas; there are five",
+   "where": "area|DMA",
+   "fix": "\\bfive\\b|\\b5 (areas|DMAs)"
+  },
+  {
+   "id": "P3",
+   "what": "B recall 9/11 is 81.8%, not 86.4%",
+   "where": "\\bB\\b|9/11|86\\.4",
+   "fix": "81\\.8"
+  },
+  {
+   "id": "P4",
+   "what": "total detections 1,320, not 1,420",
+   "where": "detection|1,?420",
+   "fix": "1,?320"
+  },
+  {
+   "id": "P5",
+   "what": "p=0.0004 is below the 1/1001 floor",
+   "where": "p.?value|\\bp\\b|0\\.0004",
+   "fix": "0\\.001|floor|1/1,?001|below|smallest|minimum|impossible"
+  },
+  {
+   "id": "P6",
+   "what": "per km2 is 10.6 (1320/125), not 11.4",
+   "where": "km|per km|11\\.4",
+   "fix": "10\\.[56]"
+  },
+  {
+   "id": "P7",
+   "what": "review time is 11.0 h (1320 x 30 s), not 13.2 h",
+   "where": "hour|review",
+   "fix": "\\b11(\\.0)?\\s*(h|hours)"
+  }
+ ],
+ "reference": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "95% interval 78.8% to 98.0%",
+    "verdict": "wrong",
+    "correction": "That is a Wald interval; Wilson gives 75.5% to 94.9%"
+   },
+   {
+    "id": "c1",
+    "claim": "measured in four areas",
+    "verdict": "wrong",
+    "correction": "The table has five areas"
+   },
+   {
+    "id": "c2",
+    "claim": "B recall 86.4%",
+    "verdict": "wrong",
+    "correction": "9/11 = 81.8%"
+   },
+   {
+    "id": "c3",
+    "claim": "1,420 detections",
+    "verdict": "wrong",
+    "correction": "The rows sum to 1,320"
+   },
+   {
+    "id": "c4",
+    "claim": "DMA A p = 0.0004",
+    "verdict": "wrong",
+    "correction": "Below the floor of 1/1001 = 0.001"
+   },
+   {
+    "id": "c5",
+    "claim": "11.4 per km\u00b2",
+    "verdict": "wrong",
+    "correction": "1,320/125 = 10.6"
+   },
+   {
+    "id": "c6",
+    "claim": "13.2 hours of review",
+    "verdict": "wrong",
+    "correction": "1,320 x 30 s = 11.0 hours"
+   },
+   {
+    "id": "c7",
+    "claim": "38/43 = 88.4%",
+    "verdict": "confirmed",
+    "correction": ""
+   }
+  ]
+ },
+ "bad": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "38/43 = 88.4%",
+    "verdict": "confirmed",
+    "correction": ""
+   },
+   {
+    "id": "c1",
+    "claim": "five areas of 25 km\u00b2",
+    "verdict": "confirmed",
+    "correction": ""
+   }
+  ]
+ }
+}

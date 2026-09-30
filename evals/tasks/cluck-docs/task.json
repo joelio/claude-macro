@@ -1,0 +1,27 @@
+{
+ "kind": "claims",
+ "prompt": "Check every claim a new user relies on in README.md and docs/getting-started.md of the repo at <TARGET> (cluck, a Rust CLI) against its code: commands, config fields and defaults, behaviour, install steps. Return each claim with a verdict and corrected wording, and list any problems a new user following the guide would hit. No network except documentation lookups; never call a model or run cluck against one. Do not read anything under the macro repo's evals/ directory; this is a blind task.",
+ "macro": {
+  "workflow": "verify",
+  "args": {
+   "target": "README.md and docs/getting-started.md of the repo at <TARGET> (read both fully first). Every checkable claim a new user relies on.",
+   "context": "cluck is a Rust CLI (0.1.0) that runs Claude-powered pre-commit checks via lefthook. Source in <TARGET>/src.",
+   "workDir": "<WORKDIR>",
+   "rules": "No network except documentation lookups; never call a model or run cluck against one. Do not read anything under the macro repo's evals/ directory; this is a blind task.",
+   "groups": [
+    {
+     "key": "config",
+     "prompt": "Every configuration claim: frontmatter fields, runner names and defaults, modes, the {{input}} placeholder, config file keys. Cite src/."
+    },
+    {
+     "key": "behaviour",
+     "prompt": "Every behaviour claim: discovery, globs, rendering, severity verdicts, fail-open, caching, redaction, bypasses. Cite src/ and tests."
+    },
+    {
+     "key": "install",
+     "prompt": "Every install and getting-started step: what a new user must install and run, in order, and whether the guide says so."
+    }
+   ]
+  }
+ }
+}

@@ -38,11 +38,14 @@ clean() { if [ -n "$(git status --porcelain)" ]; then echo "  discarding uncommi
 # the scope; git itself cannot push (push URL points nowhere).
 COMMON=(--permission-mode dontAsk --setting-sources project --max-budget-usd "$MAX_USD"
   --disallowedTools "Bash(git push:*)" "Read(~/.claude.json)" "Read(~/.claude/**)" "Read(~/.ssh/**)" "Read(~/.aws/**)" "Read(~/.config/**)" "Read(~/.netrc)")
-WORKER_TOOLS=("Read(./**)" "Edit(./**)" "Write(./**)" Glob Grep WebFetch "Bash(npm test)" "Bash(npm test --silent)"
-  "Bash(node scripts/check-workflows.mjs)" "Bash(node tests/dry-run.mjs)" "Bash(node tests/dry-run.mjs --estimate:*)"
+# dontAsk matches Bash commands as written, so allow the forms a model actually uses (flags included); pipes and
+# compound commands are still refused, and improve/PROMPT.md tells the worker to run commands plainly.
+WORKER_TOOLS=("Read(./**)" "Edit(./**)" "Write(./**)" Glob Grep WebFetch WebSearch "Bash(npm test)" "Bash(npm test:*)"
+  "Bash(node scripts/check-workflows.mjs)" "Bash(node scripts/check-workflows.mjs:*)" "Bash(node tests/dry-run.mjs)" "Bash(node tests/dry-run.mjs:*)"
+  "Bash(node evals/grade.mjs:*)"
   "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" "Bash(ls:*)"
   mcp__exa__web_search_exa mcp__exa__web_fetch_exa mcp__exa__get_code_context_exa mcp__context7__resolve-library-id mcp__context7__query-docs)
-REVIEW_TOOLS=("Read(./**)" Glob Grep "Bash(npm test)" "Bash(npm test --silent)" "Bash(git show:*)" "Bash(git diff:*)" "Bash(git log:*)")
+REVIEW_TOOLS=("Read(./**)" Glob Grep "Bash(npm test)" "Bash(npm test:*)" "Bash(git show:*)" "Bash(git diff:*)" "Bash(git log:*)")
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=/dev/null/push-disabled-by-improve
 if [ $RETRO = 1 ]; then
   before=$(git rev-parse HEAD)

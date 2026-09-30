@@ -1,0 +1,18 @@
+{
+ "kind": "debug",
+ "prompt": "Find the root cause. Symptom: with [runner] mode = \"interactive\" in .cluck/cluck.toml, every check prints '\u26a0 <check>: skipped (cli output missing structured_output)' and the commit goes through without a verdict. Seen on every run. Repo: <TARGET> (cluck, a Rust CLI whose claude-cli runner spawns claude -p with --output-format json and a --json-schema). The claude CLI here may be newer than the code. At most 15 claude -p calls in total, each with --model claude-haiku-4-5, logged-in session only; never set ANTHROPIC_API_KEY. Do not read anything under the macro repo's evals/ directory; this is a blind task.",
+ "macro": {
+  "workflow": "debug",
+  "args": {
+   "symptom": "With [runner] mode = \"interactive\" in .cluck/cluck.toml, every check prints '\u26a0 <check>: skipped (cli output missing structured_output)' and the commit goes through without a verdict. Seen on every run.",
+   "context": "cluck is a Rust CLI whose claude-cli runner spawns claude -p with --output-format json and a --json-schema built from the verdict type, and reads the verdict from the JSON output. Interactive mode reuses a logged-in Claude Code session.",
+   "repo": "<TARGET>",
+   "workDir": "<WORKDIR>",
+   "versions": "claude CLI on this machine is newer than the code; see claude --version",
+   "budgets": {
+    "modelCalls": 15
+   },
+   "rules": "Each claude -p call uses --model claude-haiku-4-5 and the logged-in session only; never set ANTHROPIC_API_KEY. Do not read anything under the macro repo's evals/ directory; this is a blind task."
+  }
+ }
+}

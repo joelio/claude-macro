@@ -1,0 +1,24 @@
+{
+ "kind": "claims",
+ "prompt": "Check every claim in the report at <TARGET>/report.md against its data (<TARGET>/data.csv) and its own tables: numbers, intervals, p-values, counts, ratios and method statements. Return each checkable claim with a verdict (confirmed, partly, wrong, unverifiable) and the exact corrected wording when not confirmed. Do not read anything under the macro repo's evals/ directory; this is a blind task.",
+ "macro": {
+  "workflow": "verify",
+  "args": {
+   "target": "The report at <TARGET>/report.md, with its data in <TARGET>/data.csv (read both fully first). Every checkable claim.",
+   "context": "A short results report for a fictional acoustic leak-detection pilot. Everything needed is in the two files.",
+   "workDir": "<WORKDIR>",
+   "rules": "Do not read anything under the macro repo's evals/ directory; this is a blind task.",
+   "groups": [
+    {
+     "key": "numbers",
+     "effort": "low",
+     "prompt": "Re-derive every number from data.csv and the report's own tables: counts, totals, percentages, per-km\u00b2 figures, ratios and review hours."
+    },
+    {
+     "key": "method",
+     "prompt": "Check every statistical and method statement: the interval (name the method that gives it), the p-values against the stated null and number of draws, and whether the text matches the tables."
+    }
+   ]
+  }
+ }
+}

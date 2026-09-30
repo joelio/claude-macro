@@ -7,6 +7,7 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
 - `workflows/*.js` — Workflow tool scripts. Inputs come from `args`; see `examples/` for real ones.
 - `packs/<name>/` — optional stack-specific harness, examples and LESSONS (e.g. `web-perf`). Installed with `scripts/install.sh --pack <name>`.
 - `improve/` and `scripts/improve.sh` — the bounded self-improvement loop and its backlog.
+- `evals/` — the eval (macro against single-agent baselines). `npm test` self-tests its graders. Never put an answer key where a task prompt points.
 - `tests/dry-run.mjs` — zero-token end-to-end run of every workflow against every example. `npm test` runs it with the checker.
 - `skills/macro/SKILL.md` — the trigger skill, symlinked from `~/.claude/skills/macro`. Keep it in step with the workflows, and refer to repo files by path relative to the repo, never an absolute path.
 - `scripts/install.sh` — per-developer install and `--check`. Anything a workflow or harness newly depends on goes in here and in README's Install section.

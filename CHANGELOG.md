@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- The eval (`evals/`): 4 tasks with answer keys (planted-report, clean-report, cluck-docs, debug-22), deterministic graders that `npm test` self-tests, a single-agent baseline for arms A and C, and blind trial preparation. Real macro output from dogfood runs 1 and 2 already grades as passing: cluck-docs 5/5, debug-22 2/2.
+- The improve loop allows the forms of `npm test` a model actually runs, and the prompt says to run commands plainly (three items were blocked in its first run).
+
 - A quote check (mechanical, Sonnet `low`) before the adversary in investigate and verify. A missing source is reported as `source-missing`, never a pass, and such claims can't support safe claims.
 - Verify's claims inventory: every checkable claim is assigned to exactly one group, and anything unchecked comes back as `missed`.
 - An optional `recheck` of the adversary's citations in verify and change-evidence.

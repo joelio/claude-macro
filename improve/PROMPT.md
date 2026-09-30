@@ -4,7 +4,7 @@ You are one iteration of this repo's self-improvement loop. You start with a fre
 2. Study before changing: read the files the item names and search the repo before assuming something is missing.
 3. Research lightly: at most 5 lookups. Use context7 for library or Claude Code behaviour and exa for current practice or specs, and WebFetch or curl if they are unavailable. Only look things up when a fact matters to the change (for example "does the Workflow runtime enforce minItems?"). Note what you found, with URLs, under the item.
 4. Make the smallest change that completes the item. Follow CLAUDE.md: plain JavaScript, identical shared prelude in every workflow, effort on every agent, estate-neutral.
-5. Run `npm test`. If it fails, escalate rather than retry the same thing:
+5. Run `npm test` as a plain command: commands are allow-listed exactly as written, so pipes, `cd`, `&&` and redirects are refused. Read the output as it comes. If it fails, escalate rather than retry the same thing:
    - Attempt 2: try a fundamentally different approach, not a tweak.
    - Attempt 3: read the relevant source (the checker, the dry run, the runtime docs) and build the smallest reproduction of the failure first.
    - After 3 failed attempts, stop with `RESULT: blocked <item title>: <one line on why>`. The loop discards your changes.

@@ -1,0 +1,79 @@
+{
+ "kind": "claims",
+ "planted": [
+  {
+   "id": "K1",
+   "what": "getting-started never says to install Claude Code, which the default runner needs",
+   "where": "install|claude|runner|getting.started",
+   "fix": "install.{0,60}claude|claude code.{0,80}(install|not installed|missing|required|prerequisite)|claude.{0,40}(cli|binary|executable).{0,60}(missing|not found|required|install)"
+  },
+  {
+   "id": "K2",
+   "what": "mode must sit under a [runner] table",
+   "where": "mode|interactive",
+   "fix": "\\[runner\\]"
+  },
+  {
+   "id": "K3",
+   "what": "omitted severity defaults to error (blocking)",
+   "where": "severity|frontmatter|required|optional",
+   "fix": "sever.{0,120}(default|omit).{0,120}(error|block)|default.{0,40}\\berror\\b|(error|block).{0,60}default"
+  },
+  {
+   "id": "K4",
+   "what": "only passing results are cached",
+   "where": "cach",
+   "fix": "pass(ing|es)?.{0,60}cach|cach.{0,80}pass|only.{0,30}pass"
+  },
+  {
+   "id": "K5",
+   "what": "CLUCK_DISABLED disables with any value, including 0",
+   "where": "CLUCK_DISABLED",
+   "fix": "any value|=0|is_ok|merely set|set at all|including 0|even 0"
+  }
+ ],
+ "reference": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "getting-started install steps",
+    "verdict": "wrong",
+    "correction": "It never tells you to install Claude Code, which the default claude-cli runner requires"
+   },
+   {
+    "id": "c1",
+    "claim": "mode = \"interactive\" in cluck.toml",
+    "verdict": "partly",
+    "correction": "mode must sit under a [runner] table"
+   },
+   {
+    "id": "c2",
+    "claim": "severity is required",
+    "verdict": "partly",
+    "correction": "severity defaults to error when omitted, so the check blocks"
+   },
+   {
+    "id": "c3",
+    "claim": "Results are cached",
+    "verdict": "partly",
+    "correction": "Only passing results are cached"
+   },
+   {
+    "id": "c4",
+    "claim": "CLUCK_DISABLED=1 disables",
+    "verdict": "partly",
+    "correction": "Any value, including 0, disables it (is_ok)"
+   }
+  ]
+ },
+ "bad": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "install steps",
+    "verdict": "confirmed",
+    "correction": ""
+   }
+  ]
+ }
+}

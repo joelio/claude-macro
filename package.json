@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-workflows.mjs && node tests/dry-run.mjs"
+    "test": "node scripts/check-workflows.mjs && node tests/dry-run.mjs && node evals/grade.mjs --self-test"
   }
 }

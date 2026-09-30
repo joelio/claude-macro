@@ -85,6 +85,7 @@ The first four rows predate v0.2's compact adversary payloads, which should cut 
 - [Running well](docs/guide/running-well.md): scoping, effort profiles, estimates, lessons via `tools`, safety rules, chaining.
 - [Improving](docs/guide/improving.md): `did-it-help.md`, the retro, the self-improvement loop, packs.
 - [Troubleshooting](docs/guide/troubleshooting.md): the problems we hit and their fixes.
+- [The eval](evals/README.md): does macro beat a single agent? Tasks with known answers, three arms, deterministic graders.
 
 Method notes: [citations](docs/citations.md), [adversarial review](docs/adversarial.md), the [report template](docs/report-template.md) and [LESSONS.md](LESSONS.md). Maintainer notes are in `CLAUDE.md`; versions in `CHANGELOG.md`.
 
@@ -100,3 +101,4 @@ Method notes: [citations](docs/citations.md), [adversarial review](docs/adversar
 | `improve/` | The self-improvement prompts and backlog |
 | `scripts/` | `install.sh`, `improve.sh`, `exa-headers.sh`, `check-workflows.mjs` |
 | `tests/dry-run.mjs` | Zero-token run of every workflow and example, and `--estimate` |
+| `evals/` | The eval: tasks with answer keys, graders (self-tested by `npm test`), the single-agent baseline and trial preparation |

@@ -1,0 +1,42 @@
+{
+ "kind": "claims",
+ "planted": [],
+ "reference": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "95% Wilson interval 75.5% to 94.9%",
+    "verdict": "confirmed",
+    "correction": ""
+   },
+   {
+    "id": "c1",
+    "claim": "1,320 detections",
+    "verdict": "confirmed",
+    "correction": ""
+   },
+   {
+    "id": "c2",
+    "claim": "B recall 81.8%",
+    "verdict": "confirmed",
+    "correction": ""
+   }
+  ]
+ },
+ "bad": {
+  "claims": [
+   {
+    "id": "c0",
+    "claim": "95% Wilson interval 75.5% to 94.9%",
+    "verdict": "wrong",
+    "correction": "should be 78.8% to 98.0%"
+   },
+   {
+    "id": "c1",
+    "claim": "1,320 detections",
+    "verdict": "confirmed",
+    "correction": ""
+   }
+  ]
+ }
+}

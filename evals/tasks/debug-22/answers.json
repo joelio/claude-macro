@@ -1,0 +1,25 @@
+{
+ "kind": "debug",
+ "causes": [
+  {
+   "id": "A",
+   "what": "--disallowed-tools '*' also blocks StructuredOutput",
+   "fix": "disallowed.?tools|StructuredOutput"
+  },
+  {
+   "id": "B",
+   "what": "schemars schema metadata ($schema, format, title, nullable unions) breaks --json-schema",
+   "fix": "\\$schema|schema metadata|\\bformat\\b|\\btitle\\b|schemars|nullable"
+  }
+ ],
+ "reference": {
+  "root_cause": "--disallowed-tools '*' blocks the StructuredOutput tool; the schemars $schema/format metadata also breaks --json-schema",
+  "chain": [],
+  "fix_direction": "allow StructuredOutput; sanitise the schema"
+ },
+ "bad": {
+  "root_cause": "The network is flaky",
+  "chain": [],
+  "fix_direction": "retry"
+ }
+}

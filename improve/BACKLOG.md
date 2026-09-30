@@ -45,7 +45,7 @@ One item per loop iteration, top first. `- [ ]` open, `- [x]` done, `- [!]` bloc
   Done 2026-10-01: args.budgets split 80/20, with a usage ledger; the dry run tests an overrun.
 - [x] **Debug: a "known new since" hint** (same run). The biggest finding was that cluck at HEAD breaks on the current claude CLI, a regression unrelated to the report. Add a `versions` context field, and a hypothesise instruction to list environment drift (tool or CLI versions newer than the code) as its own hypothesis.
   Done 2026-10-01: the versions arg plus an environment-drift hypothesis.
-- [ ] **Eval: does macro beat a single agent?** (needs a human, because it spends about 10M tokens for tier 0). See docs/research/2026-10-01-harness-engineering.md.
+- [ ] **Eval: does macro beat a single agent?** (in progress 2026-10-01: harness built in `evals/`; pilot next) (needs a human, because it spends about 10M tokens for tier 0). See docs/research/2026-10-01-harness-engineering.md.
   - Arms: (A) a single Opus agent; (B) macro; (C) a single Opus agent given macro's rules, token-matched.
   - Tasks with reference answers and deterministic graders:
     - a blind debug with a known fix;
