@@ -5,9 +5,12 @@
 #   2. the gate re-runs the checks from a pristine copy taken at start, so a worker cannot loosen them;
 #   3. a headless Opus run (improve/REVIEW.md, also from the pristine copy) keeps or reverts the commit.
 # Commits touching the loop's own gates (scripts/, tests/, package.json, improve/*.md except BACKLOG) are refused.
-# Never pushes. Usage: scripts/improve.sh [iterations=3]
+# Never pushes. Usage: scripts/improve.sh [iterations=3]   or   scripts/improve.sh --retro
+# --retro: one Opus run (improve/RETRO.md) reads the real runs under ~/.local/share/macro and adds evidence-backed
+# lessons and backlog items; it may only change LESSONS.md, improve/BACKLOG.md and CHANGELOG.md.
 # Env: MAX_USD_PER_RUN (default 3) caps each headless run; CLAUDE_BIN overrides the claude path.
 set -euo pipefail
+RETRO=0; [ "${1:-}" = --retro ] && { RETRO=1; shift; }
 N=${1:-3}; MAX_USD=${MAX_USD_PER_RUN:-3}
 REPO=$(cd "$(dirname "$0")/.." && pwd); cd "$REPO"
 CLAUDE=${CLAUDE_BIN:-$(command -v claude || true)}; [ -z "$CLAUDE" ] && [ -x "$HOME/.claude/local/claude" ] && CLAUDE="$HOME/.claude/local/claude"
@@ -19,10 +22,10 @@ START=$(git rev-parse HEAD)
 
 # Pristine gate: checks, tests and prompts as they were at start.
 PRISTINE=$(mktemp -d); trap 'rm -rf "$PRISTINE"' EXIT
-git archive "$START" scripts tests package.json improve/PROMPT.md improve/REVIEW.md | tar -x -C "$PRISTINE"
+git archive "$START" scripts tests package.json improve/PROMPT.md improve/REVIEW.md improve/RETRO.md | tar -x -C "$PRISTINE"
 gate() { local g; g=$(mktemp -d "$PRISTINE/gate.XXXX"); cp -R "$PRISTINE/scripts" "$PRISTINE/tests" "$PRISTINE/package.json" "$g/"
   cp -R workflows examples packs "$g/"; (cd "$g" && node scripts/check-workflows.mjs && node tests/dry-run.mjs) >/dev/null 2>&1; }
-PROTECTED='^(scripts/|tests/|package\.json$|improve/(PROMPT|REVIEW)\.md$|\.claude/)'
+PROTECTED='^(scripts/|tests/|package\.json$|improve/(PROMPT|REVIEW|RETRO)\.md$|\.claude/)'
 
 block() { # reason: mark the first open backlog item [!] and commit that
   REASON="$1" awk '!done && /^- \[ \]/ { sub(/^- \[ \]/, "- [!]"); print; print "  Blocked: " ENVIRON["REASON"]; done=1; next } { print }' \
@@ -41,6 +44,18 @@ WORKER_TOOLS=("Read(./**)" "Edit(./**)" "Write(./**)" Glob Grep WebFetch "Bash(n
   mcp__exa__web_search_exa mcp__exa__web_fetch_exa mcp__exa__get_code_context_exa mcp__context7__resolve-library-id mcp__context7__query-docs)
 REVIEW_TOOLS=("Read(./**)" Glob Grep "Bash(npm test)" "Bash(npm test --silent)" "Bash(git show:*)" "Bash(git diff:*)" "Bash(git log:*)")
 export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=remote.origin.pushurl GIT_CONFIG_VALUE_0=/dev/null/push-disabled-by-improve
+if [ $RETRO = 1 ]; then
+  before=$(git rev-parse HEAD)
+  out=$("$CLAUDE" -p "$(cat "$PRISTINE/improve/RETRO.md")" --model opus --effort high "${COMMON[@]}" \
+        --allowedTools "Read(./**)" "Read(~/.local/share/macro/**)" "Edit(./LESSONS.md)" "Edit(./improve/BACKLOG.md)" "Edit(./CHANGELOG.md)" Glob Grep \
+        "Bash(git add -A)" "Bash(git commit -m:*)" "Bash(git status:*)" "Bash(ls:*)" 2>&1 || true)
+  echo "$out" | grep '^RESULT:' | tail -1 || echo "no RESULT line: $(echo "$out" | tail -1 | cut -c1-200)"
+  clean
+  if git diff --name-only "$before" HEAD | grep -Ev '^(LESSONS\.md|improve/BACKLOG\.md|CHANGELOG\.md)$' | grep -q .; then
+    echo "retro changed files it may not; reverting"; git reset -q --hard "$before"
+  fi
+  git log --oneline "$START..HEAD"; exit 0
+fi
 echo "branch $(git branch --show-current), $N iterations, max \$$MAX_USD per run"
 
 for i in $(seq 1 "$N"); do

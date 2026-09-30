@@ -29,6 +29,9 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 ## Run it
 
 1. Scout inline first: read the ticket, find the files, establish what is already known. Put that in `context`.
+   - If the args are underspecified, interview the user one question at a time, each with your recommended answer. Look up anything the code can answer instead of asking.
+   - Underspecified args include `decide` criteria and their weights, `debug` hypotheses and the shared device, and `verify` groups.
+   - Stop when every field the workflow needs is settled. Vague args waste a whole run.
 2. Pick a run folder: `mkdir -p ~/.local/share/macro/<project>/<YYYY-MM-DD>-<slug>/` (today's date from the shell). It is the `workDir`. Save the args there as `args.json`.
 3. Write `args` from the closest file in `<repo>/examples/` or `<repo>/packs/*/examples/`. Replace every `<PLACEHOLDER>`; estate details (paths, hosts, asset names, tables) go in args, never in a script. Put what earlier runs learned into `tools`: the relevant trap bullets from `LESSONS.md` (and the pack's), and this project's lines from `~/.local/share/macro/INDEX.md`. Add stack hints there too (e.g. `CARGO_TARGET_DIR`, `. $IDF_PATH/export.sh`, `uv venv`).
 4. Tier the cost: `"effort": "low"` for mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes); the default is Sonnet at `medium`; the adversary is Opus at `high`. Change models only if the user asks, and never make the adversary weaker than the workers. Keep it under 10 agents unless the user asks for more.
@@ -39,15 +42,18 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 
 1. Write the full return value to `<workDir>/result.json`, with the run id, the transcript directory and the wall time added. Then write `<workDir>/REPORT.md` from `<repo>/docs/report-template.md`; the return value's `spent` field gives output tokens at each phase boundary. Read the journal if the summary is truncated.
 2. Check the adversary's own claims against the measured evidence and fix anything it got wrong; say so in the report. Spot-check five quotes: grep each against its source and record how many were found in the report's Method section.
-3. Append one line to `~/.local/share/macro/INDEX.md`: date, project, workflow, question, verdict, path. Give the user the report path.
+3. Append one line to `~/.local/share/macro/INDEX.md`: date, project, workflow, question, verdict, path. Give the user the report path. Every few runs, suggest `<repo>/scripts/improve.sh --retro` so the lessons from real runs reach the backlog.
 4. Offer a cross-model second opinion if `owl` is installed and the user agrees (it calls external models): `owl ask -f <workDir>/REPORT.md --format standard > <workDir>/second-opinion.md`, with the report prefixed by "List claims in this report you believe are false, each with a reason, and nothing else." Put the disagreements under "Not established".
 5. Create `<workDir>/did-it-help.md` for the user to fill within a day. It has four headings:
    - what the run said;
    - what turned out to be true;
    - what you would not have found alone;
    - how many of the adversary's blocker or serious objections held.
-6. Copy the report into the project (e.g. `docs/investigations/`) only if the user asks.
-7. Add any new trap to `<repo>/LESSONS.md` (or the pack's) and a cost row to `<repo>/README.md` for each workflow's first real runs.
+6. After `change-evidence`, offer a walk-through of `verification_steps`, one at a time: "Here is what should happen: … Does it?"
+   - "yes", "y" or an empty reply passes the step; anything else is logged as an issue.
+   - Write the results to `<workDir>/UAT.md`, and turn any failures into next steps.
+7. Copy the report into the project (e.g. `docs/investigations/`) only if the user asks.
+8. Add any new trap to `<repo>/LESSONS.md` (or the pack's) and a cost row to `<repo>/README.md` for each workflow's first real runs.
 
 ## Rules carried into every run
 

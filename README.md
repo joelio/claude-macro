@@ -61,6 +61,10 @@ Each workflow's `args` are documented at the top of its script; `examples/` has 
 
 It never pushes; review with `git log -p main..HEAD`.
 
+`scripts/improve.sh --retro` runs one Opus retro over your real runs: `~/.local/share/macro/INDEX.md`, each run's `did-it-help.md`, and the token numbers. It adds lessons and backlog items only for patterns seen across runs, each citing the runs that show it. It may change only `LESSONS.md`, the backlog and the changelog.
+
+In this repo, a project hook (`.claude/settings.json`) runs the checks after every edit to a workflow, example or test, and blocks with the failure until it is fixed.
+
 `npm test` is the loop's pass/fail check, and it costs no tokens:
 
 - `scripts/check-workflows.mjs` statically checks each workflow: pure meta, both-way phase match, Opus last, the evidence-tag enum, `{source, quote, via}` citations, the identical shared prelude, effort on every agent, no indented JSON in prompts, and harness syntax.

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Ideas from awesome-harness-engineering:
+  - a write-time check hook (ECC's Plankton idea);
+  - `improve.sh --retro`, which turns real runs into lessons and backlog items (ECC continuous learning plus gstack retro);
+  - one-question-at-a-time arg scoping in the skill (grill-me);
+  - a verification walk-through that writes `UAT.md` (GSD verify-work);
+  - an escalation ladder in the loop prompt (PUA's method, without the pressure).
+
 ## v0.2.0
 
 Built from three Opus reviews of v0.1 (method, cost, fit) plus research on Ralph loops.
