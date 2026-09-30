@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- From harness-engineering research (docs/research/2026-10-01-harness-engineering.md):
+  - Every workflow returns `not_run`, listing agents that failed or were skipped; the dry run's null pass enforces it.
+  - A prompt-injection rule in the shared prelude.
+  - Debug's verdict gains a `negative_control`, and "established" requires one.
+  - The skill gets effort scaling and a brief template.
+  - The eval design and five items are in the backlog.
+
 - The exa API key moves to the OS keychain. `scripts/exa-headers.sh` sends it as an `x-api-key` header through Claude Code's `headersHelper`, so it is never stored in `~/.claude.json` or shown by `claude mcp list`. `install.sh --update-mcp` migrates older installs with the key in the URL.
 - Effort profiles: `args.profile` is one of `quick`, `standard`, `deep` or `max`; per-task effort still overrides it. The dry run covers every profile.
 

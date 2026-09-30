@@ -38,14 +38,19 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 4. Tier the cost:
    - Give mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes) `"effort": "low"`.
    - The default is Sonnet at `medium` and the adversary Opus at `high`.
-   - For a hard or high-stakes question, suggest `"profile": "deep"` or `"max"` and say that it costs more; use `"quick"` for smoke tests. Change models only if the user asks, and never make the adversary weaker than the workers. Keep it under 10 agents unless the user asks for more.
+   - For a hard or high-stakes question, suggest `"profile": "deep"` or `"max"` and say that it costs more; use `"quick"` for smoke tests.
+   - Scale the number of agents to the question, following Anthropic's multi-agent research guidance (docs/research/2026-10-01-harness-engineering.md):
+     - a simple fact-finding question doesn't need macro; answer it directly;
+     - a direct comparison needs 2-4 streams, groups or options;
+     - only broad, many-sided questions need 5 or more.
+   - Give each agent an objective, what to return, which sources to use and where its task stops. Vague briefs make agents duplicate each other's work. Change models only if the user asks, and never make the adversary weaker than the workers. Keep it under 10 agents unless the user asks for more.
 5. Run `node <repo>/tests/dry-run.mjs --estimate <workDir>/args.json <workflow>`; fix any problem it reports. Note the time (`date +%s`). Call the Workflow tool with `scriptPath` set to `<repo>/workflows/<name>.js` and `args` as a JSON object (not a string). If `scriptPath` outside the session is refused, read the script and pass it as `script`.
 6. While it runs, tell the user in a few lines what each agent covers. Don't predict results.
 
 ## After a run
 
 1. Write the full return value to `<workDir>/result.json`, with the run id, the transcript directory and the wall time added. Then write `<workDir>/REPORT.md` from `<repo>/docs/report-template.md`; the return value's `spent` field is cumulative output tokens (for the whole orchestrator turn) at each phase boundary, so report the differences between marks. Read the journal if the summary is truncated.
-2. Check the adversary's own claims against the measured evidence and fix anything it got wrong; say so in the report. Spot-check five quotes: grep each against its source and record how many were found in the report's Method section.
+2. Check `not_run`: any agent listed there failed or was skipped. Say so in the report's Method and "Not established" sections, and never present the run as complete. Then check the adversary's own claims against the measured evidence, fix anything it got wrong, and say so in the report. Spot-check five quotes: grep each against its source and record how many were found in the report's Method section.
 3. Append one line to `~/.local/share/macro/INDEX.md`: date, project, workflow, question, verdict, path. Give the user the report path. Every few runs, suggest `<repo>/scripts/improve.sh --retro` so the lessons from real runs reach the backlog.
 4. Offer a cross-model second opinion if `owl` is installed and the user agrees (it calls external models): `owl ask -f <workDir>/REPORT.md --format standard > <workDir>/second-opinion.md`, with the report prefixed by "List claims in this report you believe are false, each with a reason, and nothing else." Put the disagreements under "Not established".
 5. Create `<workDir>/did-it-help.md` for the user to fill within a day. It has four headings:

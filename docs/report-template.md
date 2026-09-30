@@ -30,4 +30,4 @@
 
 ## Method
 
-<Streams, groups, options or hypotheses; models and effort; live traffic used; verdict counts (e.g. "123 claims: 68 confirmed, 47 partly, 5 wrong, 3 unverifiable").>
+<Streams, groups, options or hypotheses; models and effort; live traffic used; verdict counts (e.g. "123 claims: 68 confirmed, 47 partly, 5 wrong, 3 unverifiable"); agents not run (`not_run`), or "all agents ran".>

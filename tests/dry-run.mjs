@@ -2,7 +2,7 @@
 // Three passes per example:
 //   full   - every schema field filled, first enum value, one item per array;
 //   sparse - empty arrays where the schema allows, enum values varied by call;
-//   null   - each agent in turn returns null (as when it fails or is skipped).
+//   null   - each agent in turn returns null (as when it fails or is skipped); it must appear in not_run.
 // Each example also runs under the quick, deep and max profiles, and an unknown profile must be rejected.
 // Fails on a thrown error, undefined or [object Object] in a prompt, an agent without model, effort or schema,
 // more than 10 agents, or (full pass) a last agent that is not the adversary on opus.
@@ -98,6 +98,8 @@ for (const w of workflows) {
     for (let k = 0; k < full.calls.length; k++) {
       const r = await runOnce(w, args, 'full', k);
       if (r.problems.length) nulls.push(`agent ${k} (${full.calls[k].label}) null: ${r.problems.join(', ')}`);
+      // A failed agent must be reported, never silently dropped (default-fail).
+      else if (!(r.out && Array.isArray(r.out.not_run) && r.out.not_run.length)) nulls.push(`agent ${k} (${full.calls[k].label}) returned null but not_run is empty`);
     }
     const problems = [...full.problems, ...sparse.problems.map(p => `sparse: ${p}`), ...nulls];
     if (problems.length) fail(name, problems.join('; '));
