@@ -1,0 +1,21 @@
+{
+  "topic": "Why does the next Terraform plan show changes nobody committed, and does the cluster match its manifests?",
+  "context": "Terraform root module at <TF_DIR>, manifests at <MANIFEST_DIR>, kubectl context <KUBE_CONTEXT>. Lead suspects a provider upgrade and a manual console edit.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-drift",
+  "rules": "Read-only: terraform plan with -lock=false and kubectl diff only; never apply, import, taint or edit state. Plan output may hold secrets, so keep it in workDir and quote only resource addresses.",
+  "streams": [
+    {
+      "key": "tf-plan",
+      "prompt": "Run packs/infra/harness/terraform-plan-diff/run.sh. List each changed resource with its action, and for each the attribute that differs, from plan.json.",
+      "effort": "low"
+    },
+    {
+      "key": "provider-drift",
+      "prompt": "Compare the provider versions in the lock file with the versions used at the last apply, and read the provider changelogs for default changes that explain the diff."
+    },
+    {
+      "key": "k8s-drift",
+      "prompt": "Run packs/infra/harness/kubectl-diff/run.sh on the manifests. For each changed object say whether the cluster or the manifest is ahead, and whether a controller or operator rewrites the field."
+    }
+  ]
+}

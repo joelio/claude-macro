@@ -96,7 +96,7 @@ Method notes: [citations](docs/citations.md), [adversarial review](docs/adversar
 | `examples/` | Example `args`, named `<workflow>-*.json` |
 | `skills/macro/` | The trigger skill, linked by the installer |
 | `docs/` | Method notes, the report template and these guides |
-| `packs/` | Optional stack-specific harnesses (`web-perf`) |
+| `packs/` | Optional stack-specific harnesses (`web-perf`, `infra`); `packs/README.md` says how to write one |
 | `improve/` | The self-improvement prompts and backlog |
 | `scripts/` | `install.sh`, `improve.sh`, `exa-headers.sh`, `check-workflows.mjs` |
 | `tests/dry-run.mjs` | Zero-token run of every workflow and example, and `--estimate` |
