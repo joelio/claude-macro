@@ -1,0 +1,14 @@
+{
+  "change": "Branch perf/<name>, commit <sha> in <REPO>: defer peripheral init to after app_main on an ESP32 firmware (git -C <REPO> show <sha>).",
+  "context": "ESP-IDF <version>, board <board> on serial port <PORT>. The change must cut boot time without dropping any init step.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-esp32-boot",
+  "rules": "Flash only the board assigned for this run. Never touch other serial devices. Builds happen in a copy of the repo under the work dir.",
+  "checks": [
+    { "key": "init-coverage", "effort": "low", "prompt": "List every init call removed or moved by the commit with file:line, and where it now runs." }
+  ],
+  "benchmark": {
+    "kind": "device",
+    "prompt": "Build before and after images. For each arm, reset the board and log the serial output with a host timestamp on each line until the 'app_main' marker; report time from reset to that marker. Same power source and USB cable throughout.",
+    "effort": "medium"
+  }
+}

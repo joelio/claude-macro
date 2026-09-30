@@ -17,6 +17,11 @@
   - The smoke example now exercises exa.
   - The skill: lighter pre-reading, a GitHub visibility preflight, and `versions`.
 
+- From the improve loop's first run:
+  - Debug and decide log how many facts lack a citation, like investigate and verify. LESSONS records that schemas are validated at the tool-call layer with a retry.
+  - `packs/README.md` (how to write a pack) and a minimal `packs/infra/` pack: read-only Terraform plan-diff and kubectl diff helpers, plus investigate and verify examples.
+  - change-evidence: ESP32 boot-time and GPU latency benchmark examples; device and gpu `BENCH_RULES` now name the boot stage measured and require event or synchronised GPU timing.
+
 - From harness-engineering research (docs/research/2026-10-01-harness-engineering.md):
   - Every workflow returns `not_run`, listing agents that failed or were skipped; the dry run's null pass enforces it.
   - A prompt-injection rule in the shared prelude.

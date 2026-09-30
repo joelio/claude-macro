@@ -1,0 +1,22 @@
+{
+  "target": "The change summary at <REPORT_PATH> claiming the plan only replaces one security group rule (read it fully first)",
+  "context": "Raw plan output under <WORK_DIR>. Terraform root module at <TF_DIR>, read-only.",
+  "groups": [
+    {
+      "key": "plan-data",
+      "prompt": "Re-derive every count and action from plan.json: resources changed, replaced versus updated, and any create-before-destroy ordering.",
+      "effort": "low"
+    },
+    {
+      "key": "provider-docs",
+      "prompt": "Provider documentation for each changed resource: which attributes force replacement, and whether in-place update is possible."
+    }
+  ],
+  "attacks": [
+    {
+      "key": "blast-radius",
+      "prompt": "Target: the claim that the replacement is safe to apply. Dependent resources, brief loss of connectivity, state drift, and what the plan cannot show."
+    }
+  ],
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-verify"
+}

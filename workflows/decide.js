@@ -176,7 +176,8 @@ const sharedTasks = (A.shared || []).map(s => () =>
 const got = (await parallel([...optionTasks, ...sharedTasks])).filter(Boolean)
 const options = got.filter(g => g.option), shared = got.filter(g => g.stream)
 const missing = A.options.filter(o => !options.some(x => x.option === o.key)).map(o => o.key)
-log(`${options.length}/${A.options.length} options and ${shared.length}/${(A.shared || []).length} shared streams returned`)
+const allFacts = [...options.flatMap(o => [...o.criteria.flatMap(c => c.facts || []), ...(o.dealbreakers || [])]), ...shared.flatMap(s => s.findings || [])]
+log(`${options.length}/${A.options.length} options and ${shared.length}/${(A.shared || []).length} shared streams returned; ${uncited(allFacts)} of ${allFacts.length} facts without a citation`)
 
 phase('Attack'); mark('Attack')
 const DECISION = { type: 'object', properties: {

@@ -156,8 +156,8 @@ const checks = (await parallel(A.checks.map(c => () =>
 const BENCH_RULES = {
   process: 'hyperfine or an equivalent: warm-up runs discarded, fresh process per run.',
   browser: 'fresh browser process per run, no shared HTTP or V8 state; discard warm-ups.',
-  device: 'n boots or cycles on the same power source; timestamps from the serial log; one test on the device at a time.',
-  gpu: 'discard the first runs; pin clocks if possible; record driver, CUDA and firmware versions.',
+  device: 'n boots or cycles on the same power source; timestamps from the serial log, and say which boot stage (ROM, second-stage bootloader, app startup) each span covers; one test on the device at a time.',
+  gpu: 'discard the first runs; GPU work is asynchronous, so time with device events or synchronize before reading the clock; pin clocks if possible; record driver, CUDA and firmware versions.',
 }
 let bench = null
 if (A.benchmark) {

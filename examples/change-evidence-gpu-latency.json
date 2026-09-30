@@ -1,0 +1,14 @@
+{
+  "change": "Branch perf/<name>, commit <sha> in <REPO>: fuse two kernels in the inference path (git -C <REPO> show <sha>).",
+  "context": "GPU <model>, driver <version>, CUDA <version>, model <model-file>. Outputs must match the baseline within tolerance.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-gpu-latency",
+  "rules": "Use only the GPU assigned for this run and start no other GPU jobs. Builds happen in a copy of the repo under the work dir.",
+  "checks": [
+    { "key": "outputs-match", "effort": "low", "prompt": "Run the same fixed inputs through both builds and report the max absolute difference in outputs." }
+  ],
+  "benchmark": {
+    "kind": "gpu",
+    "prompt": "Measure single-request inference latency for before and after at batch size 1 and the production batch size. Time with CUDA events, not wall clock around an async call. Record clocks, power limit and temperature.",
+    "effort": "medium"
+  }
+}
