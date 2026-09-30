@@ -1,0 +1,8 @@
+# name	path	status	cache-control (lines joined with |)	extra curl args
+# DIGEST is replaced with 64 hex-ish characters. Example cases for fingerprinted assets behind nginx with an app fallback.
+digested asset	/assets/app-DIGEST.js	200	public, max-age=31536000, immutable
+digested asset 304	/assets/app-DIGEST.js	304	public, max-age=31536000, immutable	-H If-Modified-Since:_Wed,_01_Jan_2099_00:00:00_GMT
+digested asset missing (rolling deploy)	/assets/gone-DIGEST.js	404	no-store
+undigested asset	/assets/plain.js	200	private|no-store|no-cache
+HTML page	/index.html	200	private|no-store|no-cache
+short hash is not a digest (add_header skips 404s)	/assets/app-abc123.js	404	private

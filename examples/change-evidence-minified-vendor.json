@@ -1,0 +1,24 @@
+{
+  "change": "Branch perf/<name>, commit <sha> in worktree <WT>: point the importmap pin at the vendor's minified build (git -C <WT> show <sha>).",
+  "context": "The unminified vendor bundle is downloaded on every full page load with no-store. Package dir <PKG_DIR>.",
+  "workDir": "<HOME>/.local/share/<project>/<change>",
+  "qaAudience": "QA engineers with UI, Grafana and Sentry only (no kubectl)",
+  "checks": [
+    {
+      "key": "bytes",
+      "effort": "low",
+      "prompt": "Raw, gzip at the level the asset pipeline uses (cite the source line), brotli; what actually goes on the wire; transfer-time arithmetic labelled as such."
+    },
+    {
+      "key": "equivalence",
+      "prompt": "Same version banner and package; identical export list; every name the app imports exists; headless runtime smoke of both builds with the app's real configs, n=3 each, compare errors, DOM counts and interactions."
+    },
+    {
+      "key": "build",
+      "prompt": "Production asset precompile with the change: digested output present, old file absent, source-map handling, importmap resolves to the new file, the container build ships it. Clean up build output after."
+    }
+  ],
+  "benchmark": {
+    "prompt": "Local server serving both files precompressed with no-store. Measure import wall time, compile and evaluate time, long tasks and heap for each build, unthrottled, 4x CPU and an emulated 20 Mbit/s link."
+  }
+}

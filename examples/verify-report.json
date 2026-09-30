@@ -1,0 +1,47 @@
+{
+  "target": "The investigation report at <REPORT_PATH> (read it fully first)",
+  "context": "Raw evidence under <WORK_DIR>. Rails app at <REPO>, read-only.",
+  "groups": [
+    {
+      "key": "http-caching",
+      "prompt": "RFC 9111/9110/8246 semantics, Chrome reload and bfcache behaviour with no-store, nginx header inheritance and try_files fall-through, whether Playwright routing disables the cache."
+    },
+    {
+      "key": "security-guidance",
+      "prompt": "ASVS 4.0.3 and 5.0 wording, WSTG-ATHN-06, Burp and ZAP rule scope, Rails asset guide; confirm the commit history behind no-store."
+    },
+    {
+      "key": "js-platform",
+      "prompt": "Gem source for eager vs lazy loading, es-module-shims behaviour, import maps and Notification support on old iOS, top-level await semantics, Turbo reload rules."
+    },
+    {
+      "key": "libraries",
+      "prompt": "Library specifics from docs and vendored source: chart library load order, plugin registration, editor global, maps loader, vendor module build and licensing."
+    },
+    {
+      "key": "codebase",
+      "prompt": "Re-verify every file:line and every count in the report against the repo.",
+      "effort": "low"
+    },
+    {
+      "key": "data",
+      "prompt": "Re-derive every number from the raw files. Units, n, variance, and any double counting in grouped bars."
+    },
+    {
+      "key": "logic",
+      "prompt": "Premises and conclusions for each recommendation: hidden assumptions, overgeneralisation, confounders (HTTP/2, Turbo, first visits, bfcache), missing alternatives, and evidence tags stated more strongly than the evidence.",
+      "model": "opus",
+      "effort": "high"
+    }
+  ],
+  "attacks": [
+    {
+      "key": "caching",
+      "prompt": "Target: cache fingerprinted assets for a year and call it the biggest win. Security, operational and benefit arguments against."
+    },
+    {
+      "key": "lazy-js",
+      "prompt": "Target: lazy controller loading and on-demand library loaders. Old-browser shims, flash of unenhanced content, serial load chains, test coverage, cheaper alternatives."
+    }
+  ]
+}

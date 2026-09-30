@@ -1,0 +1,33 @@
+{
+  "topic": "Per-page JS/CSS weight: ticket says every page loads data it doesn't need",
+  "context": "Rails app at <REPO> (importmap, Stimulus, Turbo). Prod <PROD_URL>. Lead has established: /assets served no-store; eager controller loading pulls every library on every page.",
+  "workDir": "<HOME>/.local/share/<project>/page-weight",
+  "rules": "Prod: only unauthenticated GETs of the public login page and its assets, at most 8 page loads per stream.",
+  "streams": [
+    {
+      "key": "network",
+      "prompt": "Cold x3 and warm reload x2 of the login page: every request with origin, size, cache-control, served-from-cache. Break totals down by source, top 10 by bytes. Save HAR.",
+      "effort": "low"
+    },
+    {
+      "key": "cpu",
+      "prompt": "CDP profiler and trace, 3 runs unthrottled and 3 at 4x CPU: script time per URL, long tasks, DCL/load. Say if per-URL attribution is unreliable."
+    },
+    {
+      "key": "usage-map",
+      "prompt": "Static analysis: for each heavy library, which modules import it, which controllers use it, which views mount them. Dead controllers. Globals that break under lazy loading."
+    },
+    {
+      "key": "security-history",
+      "prompt": "Why is /assets no-store? git log -S and PR history, any pentest findings, current headers via curl -I, and what RFC 9111, RFC 8246 and OWASP say. What must stay no-store?"
+    },
+    {
+      "key": "compat-risk",
+      "prompt": "Risk of lazy controller loading, moving imports out of application.js, on-demand loaders and far-future caching, including old-browser shims. Rate benefit, risk and how to verify each."
+    },
+    {
+      "key": "real-world",
+      "prompt": "How often do users pay the full-load cost? Code paths that bypass Turbo, plus any read-only telemetry (logs, RUM). Mark estimates as inferred."
+    }
+  ]
+}
