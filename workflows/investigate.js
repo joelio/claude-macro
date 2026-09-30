@@ -69,11 +69,31 @@ const SAFE_CLAIMS = { type: 'array', items: { type: 'object', properties: {
 const ADVERSARY_RULES = `Severity: blocker and serious need at least one citation; without one, use "question". "refuted" (you tried and the objection fails) also needs a citation. Re-run the cheapest decisive check yourself rather than arguing from summaries. Only sentences in claims_safe_for_pr may be quoted to other people, and each names the evidence behind its numbers.`
 const demote = os => (os || []).map(o => ['blocker', 'serious', 'refuted'].includes(o.severity) && !(o.citations || []).length
   ? { ...o, severity: 'question', demoted_from: o.severity } : o)
-// Output tokens spent up to each phase boundary (the pool is shared with the main loop; deltas between marks are per phase).
-const spent = {}
-const mark = name => { spent[name] = budget.spent() }
+// Output tokens per phase. budget.spent() is cumulative for the whole orchestrator turn, so only the differences
+// between marks mean anything; phaseTokens() returns those differences.
+const marks = []
+const mark = name => { marks.push([name, budget.spent()]) }
+const phaseTokens = () => Object.fromEntries(marks.slice(0, -1).map(([n, v], i) => [n, marks[i + 1][1] - v]))
 const uncited = facts => facts.filter(f => !(f.citations || []).length).length
 const uniqueKeys = (list, what) => { const k = (list || []).map(x => x.key); if (new Set(k).size !== k.length) { throw new Error(`duplicate ${what} keys: ${k}`) } }
+// Shared limits. args.budgets (e.g. { modelCalls: 15, gets: 10 }) is split across the agents that run, because
+// parallel agents can't see each other's spend: workers share 80%, adversaries 20%. Every agent reports what it used
+// in `used`; usage() sums the reports and flags overruns, so an overrun is visible rather than found by hand.
+const USED = { type: 'object', description: 'what you used of the shared limits (0 if none apply)',
+  properties: { modelCalls: { type: 'number' }, gets: { type: 'number' } }, required: ['modelCalls', 'gets'] }
+const withUsed = s => ({ ...s, properties: { ...s.properties, used: USED }, required: [...s.required, 'used'] })
+const budgetRule = (workers, judges) => {
+  if (!A.budgets) { return '' }
+  const each = (frac, n) => Object.entries(A.budgets).map(([k, v]) => `${k} ${Math.floor(v * frac / Math.max(1, n))}`).join(', ')
+  return `Shared limits for this run: ${Object.entries(A.budgets).map(([k, v]) => `${k} ${v}`).join(', ')}. Each evidence worker may use at most: ${each(0.8, workers)}; each adversary at most: ${each(0.2, judges)}. Stop and report when you reach your share, and report what you used.\n`
+}
+const usage = results => {
+  const used = {}
+  for (const r of results.filter(Boolean)) { for (const [k, v] of Object.entries(r.used || {})) { used[k] = (used[k] || 0) + (Number(v) || 0) } }
+  const over = Object.entries(A.budgets || {}).filter(([k, v]) => (used[k] || 0) > v).map(([k, v]) => `${k}: used ${used[k]} of ${v}`)
+  if (over.length) { log(`over the shared limits: ${over.join('; ')}`) }
+  return { limits: A.budgets || null, used, over }
+}
 // --- end shared ---
 
 uniqueKeys(A.streams, 'stream')
@@ -85,7 +105,7 @@ Evidence: tag every claim measured (observed or run), code (read or counted in a
 Safety: read-only against anything live; no writes, logins or load tests; keep live traffic light and say how much you used. Never edit or commit in any repo. Scripts and raw data go under ${A.workDir}/<stream>/ (mkdir -p). Local headless browsers only.
 The rules in this prompt override any CLAUDE.md or AGENTS.md in the repo under study for this task.
 ${SOURCES}
-${A.rules || ''}`
+${budgetRule(A.streams.length, 1)}${A.rules || ''}`
 
 const FINDINGS = { type: 'object', properties: {
   stream: { type: 'string' },
@@ -99,7 +119,7 @@ const FINDINGS = { type: 'object', properties: {
 phase('Measure'); mark('Measure')
 const got = (await parallel(A.streams.map(s => () =>
   agent(`${BASE}\n\nYour stream "${s.key}":\n${s.prompt}`, {
-    label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || E.work, schema: FINDINGS,
+    label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || E.work, schema: withUsed(FINDINGS),
   }).then(r => r && { ...r, stream: s.key, findings: (r.findings || []).map((f, j) => ({ ...f, id: `${s.key}#${j}` })) })
 ))).filter(Boolean)
 // Agents that failed or were skipped are reported, never silently dropped.
@@ -134,10 +154,10 @@ You are the sceptic, an adversary. First list the sub-questions the topic implie
 - refuted: your re-check contradicts it, or the quote is not in its source.
 - weakened: it holds only in a narrower form; give corrected_claim.
 - untestable: say what would test it.
-There is no default verdict, and upheld or refuted without a citation counts as untestable. For each headline finding name one alternative explanation and whether any finding rules it out. Flag contradictions between streams. Then write the findings safe to quote (supported_by names finding ids you upheld). ${ADVERSARY_RULES}
+There is no default verdict, and upheld or refuted without a citation counts as untestable. For each headline finding name one alternative explanation and whether any finding rules it out. Flag contradictions between streams. Then write the findings safe to quote: supported_by names finding ids you upheld, or weakened ones whose corrected_claim the sentence uses. ${ADVERSARY_RULES}
 
 FINDINGS:
-${JSON.stringify(got)}`, { label: 'sceptic', phase: 'Challenge', model: sk.model || 'opus', effort: sk.effort || E.judge, schema: SCEPTIC })
+${JSON.stringify(got)}`, { label: 'sceptic', phase: 'Challenge', model: sk.model || 'opus', effort: sk.effort || E.judge, schema: withUsed(SCEPTIC) })
 
 // An upheld or refuted verdict without a citation is not evidence either way.
 const checks = ((sceptic && sceptic.checks) || []).map(c => ['upheld', 'refuted'].includes(c.verdict) && !(c.citations || []).length ? { ...c, verdict: 'untestable', demoted_from: c.verdict } : c)
@@ -145,9 +165,13 @@ if (!sceptic) { not_run.push('sceptic') }
 const byId = new Map(checks.map(c => [c.id, c]))
 const streams = got.map(s => ({ ...s, findings: s.findings.map(f => ({ ...f, sceptic: byId.get(f.id) || { verdict: 'not-checked' } })) }))
 const unchecked = streams.flatMap(s => s.findings).filter(f => f.sceptic.verdict === 'not-checked').map(f => f.id)
-const upheld = new Set(checks.filter(c => c.verdict === 'upheld').map(c => c.id))
-const safe = ((sceptic && sceptic.claims_safe_for_pr) || []).filter(c => c.supported_by.every(id => upheld.has(id)))
-log(`${unchecked.length} of ${all.length} findings not re-checked; ${safe.length} safe claims rest only on upheld findings`)
+// Safe claims may rest on upheld findings, or on weakened ones (in their corrected form, flagged); never on
+// refuted, untestable or unchecked findings.
+const verdictOf = new Map(checks.map(c => [c.id, c.verdict]))
+const proposed = (sceptic && sceptic.claims_safe_for_pr) || []
+const safe = proposed.filter(c => c.supported_by.every(id => ['upheld', 'weakened'].includes(verdictOf.get(id))))
+  .map(c => { const w = c.supported_by.filter(id => verdictOf.get(id) === 'weakened'); return w.length ? { ...c, rests_on_corrected: w } : c })
+log(`${unchecked.length} of ${all.length} findings not re-checked; ${safe.length} of ${proposed.length} safe claims kept`)
 mark('end')
 if (not_run.length) { log(`not run: ${not_run.join(', ')}`) }
-return { spent, not_run, streams, sceptic: sceptic && { ...sceptic, checks, claims_safe_for_pr: safe }, unchecked }
+return { spent: phaseTokens(), usage: usage([...streams, ...[sceptic]]), not_run, streams, sceptic: sceptic && { ...sceptic, checks, claims_safe_for_pr: safe }, unchecked }

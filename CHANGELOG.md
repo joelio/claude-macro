@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Backlog work:
+  - Per-agent budgets: `args.budgets` is split across agents (80% to workers, 20% to adversaries), and `usage` sums what each agent reports and flags overruns.
+  - `spent` is now per-phase output tokens rather than cumulative totals.
+  - Investigate's safe claims may rest on weakened findings, marked `rests_on_corrected`.
+  - Verify's `contested_by` applies only to claims in an attacked group or named by an objection.
+  - Debug gains `versions`, an environment-drift hypothesis, and a `tdd_plan` field.
+  - The dry run substitutes placeholders anywhere in a value, and tests budgets.
+  - The smoke example now exercises exa.
+  - The skill: lighter pre-reading, a GitHub visibility preflight, and `versions`.
+
 - From harness-engineering research (docs/research/2026-10-01-harness-engineering.md):
   - Every workflow returns `not_run`, listing agents that failed or were skipped; the dry run's null pass enforces it.
   - A prompt-injection rule in the shared prelude.

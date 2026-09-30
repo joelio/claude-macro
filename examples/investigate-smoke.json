@@ -1,10 +1,26 @@
 {
-  "topic": "Smoke test: how many agent() calls does each macro workflow make, and does context7 document Playwright's page.route cache behaviour?",
+  "topic": "Smoke test: agent() call sites per macro workflow, and what Playwright's docs and RFC 9111 say about caching",
   "context": "The macro repo at <MACRO_REPO>, read-only. This is a cheap run to check the install: exa, context7 and a workflow run end to end.",
   "workDir": "<HOME>/.local/share/macro/macro/<runId>-smoke",
   "streams": [
-    { "key": "count", "effort": "low", "prompt": "Count agent( calls in each file under <MACRO_REPO>/workflows/. Cite file:line for each." },
-    { "key": "docs", "effort": "low", "prompt": "Using context7, find what the Playwright docs say about page.route and the HTTP cache. Quote it." }
+    {
+      "key": "count",
+      "effort": "low",
+      "prompt": "Count agent( calls in each file under <MACRO_REPO>/workflows/. Cite file:line for each."
+    },
+    {
+      "key": "docs",
+      "effort": "low",
+      "prompt": "Using context7, find what the Playwright docs say about page.route and the HTTP cache. Quote it."
+    },
+    {
+      "key": "web",
+      "effort": "low",
+      "prompt": "Using exa (web_search_exa, then web_fetch_exa for the text you quote), find what RFC 9111 section 5.2.2.5 says about no-store. Quote it, and save the fetched text."
+    }
   ],
-  "sceptic": { "effort": "low", "minClaims": 4 }
+  "sceptic": {
+    "effort": "low",
+    "minClaims": 4
+  }
 }

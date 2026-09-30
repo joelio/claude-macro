@@ -3,7 +3,8 @@
 //   full   - every schema field filled, first enum value, one item per array;
 //   sparse - empty arrays where the schema allows, enum values varied by call;
 //   null   - each agent in turn returns null (as when it fails or is skipped); it must appear in not_run.
-// Each example also runs under the quick, deep and max profiles, and an unknown profile must be rejected.
+// Each example also runs under the quick, deep and max profiles (an unknown profile must be rejected), and with a
+// tiny shared budget, which must be stated in every prompt and reported as an overrun.
 // Fails on a thrown error, undefined or [object Object] in a prompt, an agent without model, effort or schema,
 // more than 10 agents, or (full pass) a last agent that is not the adversary on opus.
 // Examples are matched by file name: examples/<workflow>-*.json and packs/*/examples/<workflow>-*.json.
@@ -17,7 +18,9 @@ const workflows = fs.readdirSync(path.join(root, 'workflows')).filter(f => f.end
 const exampleDirs = [path.join(root, 'examples'), ...fs.readdirSync(path.join(root, 'packs'), { withFileTypes: true })
   .filter(d => d.isDirectory()).map(d => path.join(root, 'packs', d.name, 'examples'))].filter(d => fs.existsSync(d));
 const examples = exampleDirs.flatMap(d => fs.readdirSync(d).filter(f => f.endsWith('.json')).map(f => path.join(d, f)));
-const readArgs = f => JSON.parse(fs.readFileSync(f, 'utf8').replace(/"<([A-Z_]+)>/g, (_, k) => `"/${k.toLowerCase()}`));
+// Placeholders: a value starting with <X> becomes an absolute path (/x); a <x> inside a value becomes plain x.
+const readArgs = f => JSON.parse(fs.readFileSync(f, 'utf8')
+  .replace(/"<([A-Za-z_]+)>/g, (_, k) => `"/${k.toLowerCase()}`).replace(/<([A-Za-z_]+)>/g, (_, k) => k.toLowerCase()));
 
 function fake(s, mode, n, key = 'x') {
   if (!s) return 'x';
@@ -33,9 +36,9 @@ function fake(s, mode, n, key = 'x') {
 
 async function runOnce(w, args, mode, nullAt = -1) {
   const src = fs.readFileSync(path.join(root, 'workflows', `${w}.js`), 'utf8');
-  const calls = [], problems = [];
+  const calls = [], problems = [], prompts = [];
   const agent = async (prompt, o = {}) => {
-    const n = calls.length; calls.push(o);
+    const n = calls.length; calls.push(o); prompts.push(prompt);
     const m = /undefined|\[object Object\]/.exec(prompt);
     if (m) problems.push(`${o.label}: prompt contains ${m[0]}`);
     if (!o.model || !o.effort || !o.schema) problems.push(`${o.label}: missing ${['model', 'effort', 'schema'].filter(k => !o[k]).join(', ')}`);
@@ -50,7 +53,7 @@ async function runOnce(w, args, mode, nullAt = -1) {
   try { out = await run(args, agent, parallel, pipeline, () => {}, () => {}, budget, async () => null); } catch (e) { problems.push(`threw: ${e.message}`); }
   if (!problems.length && !out) problems.push('returned nothing');
   if (calls.length > 10) problems.push(`${calls.length} agents; the limit is 10 unless the user asks`);
-  return { calls, problems, out };
+  return { calls, problems, out, prompts };
 }
 
 // Unit check on the shared demote(): uncited blocker, serious and refuted become questions; cited ones stay.
@@ -92,6 +95,11 @@ for (const w of workflows) {
       r.problems.forEach(p => full.problems.push(`profile ${profile}: ${p}`));
       if (profile === 'max' && r.calls.at(-1)?.effort !== 'max' && !JSON.stringify(args).includes('"effort"')) full.problems.push(`profile max left the adversary at ${r.calls.at(-1)?.effort}`);
     }
+    // Budgets: a tiny shared limit must be stated in prompts and reported as an overrun (every fake agent uses 1).
+    const tight = await runOnce(w, { ...args, budgets: { modelCalls: 1, gets: 1 } }, 'full');
+    tight.problems.forEach(p => full.problems.push(`budgets: ${p}`));
+    if (!(tight.out && tight.out.usage && tight.out.usage.over.length)) full.problems.push('a shared-limit overrun was not reported in usage.over');
+    if (!tight.prompts.every(p => p.includes('Shared limits for this run'))) full.problems.push('not every prompt states the shared-limit shares');
     const bad = await runOnce(w, { ...args, profile: 'turbo' }, 'full');
     if (!bad.problems.some(p => /profile must be one of/.test(p))) full.problems.push('an unknown profile was not rejected');
     const nulls = [];

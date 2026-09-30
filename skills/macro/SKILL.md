@@ -7,7 +7,7 @@ description: Runs the evidence-based macro workflows - parallel Sonnet agents ga
 
 An explicit "macro it", "/macro" or "run the macro workflow" is the user's opt-in to run a Workflow. Otherwise, name the workflow, the agent count and the expected cost and wait for a yes. Get the count from `node <repo>/tests/dry-run.mjs --estimate <args.json> <workflow>` (zero tokens; it also validates the args) and the cost from the README table.
 
-The method, rules and workflows live in the repo this skill belongs to; call its root `<repo>`. Find it from this skill's base directory (shown when the skill loads): `git -C "$(dirname "$(readlink -f <skill-dir>/SKILL.md)")" rev-parse --show-toplevel`. Read `<repo>/CLAUDE.md` first, then `docs/citations.md` and `docs/adversarial.md`, and `LESSONS.md` (plus the pack's `LESSONS.md`) before measuring anything.
+The method, rules and workflows live in the repo this skill belongs to; call its root `<repo>`. Find it from this skill's base directory (shown when the skill loads): `git -C "$(dirname "$(readlink -f <skill-dir>/SKILL.md)")" rev-parse --show-toplevel`. Always read the chosen workflow's header comment (its args) and `LESSONS.md` (plus the pack's). Read `CLAUDE.md`, `docs/citations.md` and `docs/adversarial.md` when you write the report, or before a `deep` or `max` run; a `quick` smoke run doesn't need them.
 
 ## Preflight
 
@@ -30,6 +30,8 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 ## Run it
 
 1. Scout inline first: read the ticket, find the files, establish what is already known. Put that in `context`.
+   - If the target lives on GitHub, check its visibility and releases read-only (`gh repo view --json visibility`, `gh release list`) and put the answer in `context`, so agents don't spend traffic on 404s.
+   - For `debug`, record the toolchain, CLI and dependency versions now in `versions`, and when the code last worked if known.
    - If the args are underspecified, interview the user one question at a time, each with your recommended answer. Look up anything the code can answer instead of asking.
    - Underspecified args include `decide` criteria and their weights, `debug` hypotheses and the shared device, and `verify` groups.
    - Stop when every field the workflow needs is settled. Vague args waste a whole run.

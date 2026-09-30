@@ -8,7 +8,11 @@ Common to all five:
 - `rules` (optional) appends safety rules to every prompt; `tools` (optional) appends notes on sources and tools.
 - `profile` (optional) is one of `quick`, `standard`, `deep` or `max` and sets the default effort for the run. In the tables below, "work" and "judge" mean the profile's worker and adversary effort: `medium` and `high` under `standard`. An `effort` on a single item overrides the profile.
 - Keys (`streams[].key`, `groups[].key`, and so on) must be unique.
-- Every result includes `spent`, output-token counts at each phase boundary. They are cumulative for the orchestrator's turn; subtract neighbouring marks for a phase's own number.
+- `budgets` (optional), such as `{ "modelCalls": 15, "gets": 10 }`, sets shared limits for the run. Parallel agents can't see each other's spend, so the script splits each limit: workers share 80% and adversaries 20%, and every prompt states the shares.
+- Every result includes:
+  - `spent`: output tokens per phase;
+  - `usage`: `{ limits, used, over }`, summed from what each agent reports it used; `over` lists any overrun;
+  - `not_run`: agents that failed or were skipped. A non-empty `not_run` means the run is incomplete, and the report must say so.
 - Every citation is `{source, quote, via}`, where `via` is one of `context7`, `exa`, `webfetch`, `curl`, `repo`, `package-source`, `raw-data` or `other`.
 - Every objection has a `severity` of `blocker`, `serious`, `minor`, `question` or `refuted`. A blocker, serious or refuted objection without a citation is demoted to `question`, with `demoted_from` recording what it was.
 - `claims_safe_for_pr` is a list of `{sentence, supported_by}`; each sentence names the evidence ids behind its numbers.
@@ -75,7 +79,7 @@ Five agents: two Sonnet `low`, two Sonnet `medium`, one Opus `high`. `examples/i
 ### What comes back
 
 ```
-{ spent, streams, sceptic, unchecked }
+{ spent, usage, not_run, streams, sceptic, unchecked }
 ```
 
 - `streams[]`: each stream's `method`, `findings`, `numbers` (a markdown table), `unknowns` and `raw_paths`. Every finding has an `id` (`<stream>#<n>`), a `kind` tag, `evidence`, `citations`, and the sceptic's verdict joined on as `sceptic.verdict`.
@@ -142,7 +146,7 @@ Four agents. The pack example `packs/web-perf/examples/verify-report.json` adds 
 ### What comes back
 
 ```
-{ spent, counts, verified, logic, attacks }
+{ spent, usage, not_run, counts, verified, logic, attacks }
 ```
 
 - `counts`: claims by verdict, for example `{ confirmed: 43, partly: 14, unverifiable: 4 }`. That line goes into the report's Method section.
@@ -209,7 +213,7 @@ Three agents. The pack example `packs/web-perf/examples/change-evidence-minified
 ### What comes back
 
 ```
-{ spent, evidence, challenge }
+{ spent, usage, not_run, evidence, challenge }
 ```
 
 - `evidence[]`: one entry per check plus the benchmark, each with `method`, `results[]`, `numbers_table`, `risks[]` and `raw_paths[]`. Each result has an `id` (`<check>#<n>`), a `kind` tag, `citations`, and a `bearing`: `supports-change`, `neutral`, `against-change` or `blocker`. The worker rates bearing; the reviewer decides.
@@ -253,6 +257,7 @@ Code changes (logging, a flag, a bisect) happen in `git clone --local` copies un
 | `repo` | yes | Absolute path of the repo under study; never edited |
 | `workDir` | yes | Absolute directory for copies, logs and raw data |
 | `repro` | no | A known command or steps that show the bug |
+| `versions` | no | Toolchain, CLI and dependency versions now, and when the code last worked. Hypothesise then includes an environment-drift hypothesis if anything is newer than the code |
 | `hypotheses` | no | `[{ key, statement, test?, exclusive? }]`, your own suspects |
 | `maxHypotheses` | no | Total tested, including yours; default 5, hard cap 6 |
 | `exclusive` | no | A resource only one test may use at a time, for example a dev board on a serial port, the one GPU, port 5432 |
@@ -283,15 +288,15 @@ The estimate shows six agents: two in Hypothesise, three falsifiers (your two pl
 ### What comes back
 
 ```
-{ spent, reproduction, hypotheses, tested, verdict }
+{ spent, usage, not_run, reproduction, hypotheses, tested, verdict }
 ```
 
 - `reproduction`: `reproduced` (`always`, `intermittent`, `no`), the `steps`, the `rate` as k of n, the `environment`, `facts[]` and `raw_paths[]`.
 - `hypotheses[]`: what was tested, each with `statement`, `kill_test`, `prior` and `needs_exclusive`.
 - `tested[]`: per hypothesis, `test_run`, `outcome` (`falsified`, `survived`, `inconclusive`), `could_have_failed`, `facts[]`, `settle_with` if inconclusive, and `fix_if_true`.
-- `verdict`: `root_cause` in one sentence or "not established"; `confidence` (`established`, `probable`, `open`); `chain[]`, the cited links from cause to symptom; `objections[]`; `unexplained[]`; `rechecks[]` it ran itself; `fix_direction`; `regression_test`, one that fails now and should pass after the fix; `claims_safe_for_pr[]`; and `next_step` (`fix`, `test-more`, `rethink`).
+- `verdict`: `root_cause` in one sentence or "not established"; `confidence` (`established`, `probable`, `open`); `chain[]`, the cited links from cause to symptom; `objections[]`; `unexplained[]`; `rechecks[]` it ran itself; `fix_direction`; `regression_test`, one that fails now and should pass after the fix; `tdd_plan`, ordered red/green steps for the fix; `negative_control`, evidence that the repro flips when only the cause is toggled (without one, confidence is capped at `probable`); `claims_safe_for_pr[]`; and `next_step` (`fix`, `test-more`, `rethink`).
 
-Read `confidence` with `unexplained`. `established` with an empty `unexplained` list is a cause you can act on; `probable` with entries means the chain has a gap the report's "Not established" section will name.
+Read `confidence` with `unexplained` and `negative_control`. `established` with an empty `unexplained` list is a cause you can act on; `probable` with entries means the chain has a gap the report's "Not established" section will name.
 
 ## decide
 
@@ -359,7 +364,7 @@ Four agents. `examples/decide-auth-provider.json` is a `research` decision betwe
 ### What comes back
 
 ```
-{ spent, options, shared, missing, decision }
+{ spent, usage, not_run, options, shared, missing, decision }
 ```
 
 - `options[]`: per option, a `summary`, `criteria[]` with a `rating` (`strong`, `adequate`, `weak`, `fails`, `unknown`) and the `facts[]` behind it, `adoption_cost` with its basis, `dealbreakers[]` and `raw_paths[]`.

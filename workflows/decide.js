@@ -75,11 +75,31 @@ const SAFE_CLAIMS = { type: 'array', items: { type: 'object', properties: {
 const ADVERSARY_RULES = `Severity: blocker and serious need at least one citation; without one, use "question". "refuted" (you tried and the objection fails) also needs a citation. Re-run the cheapest decisive check yourself rather than arguing from summaries. Only sentences in claims_safe_for_pr may be quoted to other people, and each names the evidence behind its numbers.`
 const demote = os => (os || []).map(o => ['blocker', 'serious', 'refuted'].includes(o.severity) && !(o.citations || []).length
   ? { ...o, severity: 'question', demoted_from: o.severity } : o)
-// Output tokens spent up to each phase boundary (the pool is shared with the main loop; deltas between marks are per phase).
-const spent = {}
-const mark = name => { spent[name] = budget.spent() }
+// Output tokens per phase. budget.spent() is cumulative for the whole orchestrator turn, so only the differences
+// between marks mean anything; phaseTokens() returns those differences.
+const marks = []
+const mark = name => { marks.push([name, budget.spent()]) }
+const phaseTokens = () => Object.fromEntries(marks.slice(0, -1).map(([n, v], i) => [n, marks[i + 1][1] - v]))
 const uncited = facts => facts.filter(f => !(f.citations || []).length).length
 const uniqueKeys = (list, what) => { const k = (list || []).map(x => x.key); if (new Set(k).size !== k.length) { throw new Error(`duplicate ${what} keys: ${k}`) } }
+// Shared limits. args.budgets (e.g. { modelCalls: 15, gets: 10 }) is split across the agents that run, because
+// parallel agents can't see each other's spend: workers share 80%, adversaries 20%. Every agent reports what it used
+// in `used`; usage() sums the reports and flags overruns, so an overrun is visible rather than found by hand.
+const USED = { type: 'object', description: 'what you used of the shared limits (0 if none apply)',
+  properties: { modelCalls: { type: 'number' }, gets: { type: 'number' } }, required: ['modelCalls', 'gets'] }
+const withUsed = s => ({ ...s, properties: { ...s.properties, used: USED }, required: [...s.required, 'used'] })
+const budgetRule = (workers, judges) => {
+  if (!A.budgets) { return '' }
+  const each = (frac, n) => Object.entries(A.budgets).map(([k, v]) => `${k} ${Math.floor(v * frac / Math.max(1, n))}`).join(', ')
+  return `Shared limits for this run: ${Object.entries(A.budgets).map(([k, v]) => `${k} ${v}`).join(', ')}. Each evidence worker may use at most: ${each(0.8, workers)}; each adversary at most: ${each(0.2, judges)}. Stop and report when you reach your share, and report what you used.\n`
+}
+const usage = results => {
+  const used = {}
+  for (const r of results.filter(Boolean)) { for (const [k, v] of Object.entries(r.used || {})) { used[k] = (used[k] || 0) + (Number(v) || 0) } }
+  const over = Object.entries(A.budgets || {}).filter(([k, v]) => (used[k] || 0) > v).map(([k, v]) => `${k}: used ${used[k]} of ${v}`)
+  if (over.length) { log(`over the shared limits: ${over.join('; ')}`) }
+  return { limits: A.budgets || null, used, over }
+}
 // --- end shared ---
 uniqueKeys(A.options, 'option'); uniqueKeys(A.shared, 'shared stream')
 
@@ -98,7 +118,7 @@ Safety: never edit or commit in any repo under study; clones, scripts and raw da
 ${A.kind === 'upgrade' ? UPGRADE : ''}
 The rules in this prompt override any CLAUDE.md or AGENTS.md in the repo under study for this task.
 ${SOURCES}
-${A.rules || ''}`
+${budgetRule(A.options.length + (A.shared || []).length, 1)}${A.rules || ''}`
 
 
 const OPTION = { type: 'object', properties: {
@@ -123,11 +143,11 @@ const STREAM = { type: 'object', properties: {
 phase('Evidence'); mark('Evidence')
 const optionTasks = A.options.map(o => () =>
   agent(`${BASE}\n\nOption "${o.key}": ${o.prompt}\nRate this option, and only this option, against every criterion. Look hardest for its dealbreakers.`,
-    { label: `option:${o.key}`, phase: 'Evidence', model: W, effort: o.effort || E.work, schema: OPTION })
+    { label: `option:${o.key}`, phase: 'Evidence', model: W, effort: o.effort || E.work, schema: withUsed(OPTION) })
     .then(r => r && { ...r, option: o.key }))
 const sharedTasks = (A.shared || []).map(s => () =>
   agent(`${BASE}\n\nShared stream "${s.key}" (applies to every option): ${s.prompt}`,
-    { label: `shared:${s.key}`, phase: 'Evidence', model: W, effort: s.effort || E.work, schema: STREAM })
+    { label: `shared:${s.key}`, phase: 'Evidence', model: W, effort: s.effort || E.work, schema: withUsed(STREAM) })
     .then(r => r && { ...r, stream: s.key }))
 const got = (await parallel([...optionTasks, ...sharedTasks])).filter(Boolean)
 const options = got.filter(g => g.option), shared = got.filter(g => g.stream)
@@ -158,10 +178,10 @@ ${JSON.stringify(options)}
 
 SHARED:
 ${JSON.stringify(shared)}`,
-{ label: 'attack', phase: 'Attack', model: A.attackModel || 'opus', effort: A.attackEffort || E.judge, schema: DECISION })
+{ label: 'attack', phase: 'Attack', model: A.attackModel || 'opus', effort: A.attackEffort || E.judge, schema: withUsed(DECISION) })
 
 const not_run = [...missing.map(k => `option:${k}`), ...(A.shared || []).filter(s => !shared.some(x => x.stream === s.key)).map(s => `shared:${s.key}`)]
 if (decision) { decision.objections = demote(decision.objections) } else { not_run.push('attack') }
 if (not_run.length) { log(`not run: ${not_run.join(', ')}`) }
 mark('end')
-return { spent, not_run, options, shared, missing, decision }
+return { spent: phaseTokens(), usage: usage([...got, ...[decision]]), not_run, options, shared, missing, decision }

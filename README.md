@@ -62,7 +62,7 @@ Models and effort are tiered. Sonnet does the evidence work (`low` for mechanica
 | `deep` | `high` | `xhigh` | Hard questions |
 | `max` | `high` | `max` | High stakes |
 
-An effort set on a single stream, group, check or attack overrides the profile. Before any run, `node tests/dry-run.mjs --estimate <args.json> <workflow>` lists the agents and tiers at no token cost.
+An effort set on a single stream, group, check or attack overrides the profile. `"budgets"` (for example `{ "modelCalls": 15, "gets": 10 }`) splits shared limits across the agents, and the result's `usage` flags any overrun. Before any run, `node tests/dry-run.mjs --estimate <args.json> <workflow>` lists the agents and tiers at no token cost.
 
 Cost seen in practice:
 
