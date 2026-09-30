@@ -1,0 +1,8 @@
+{
+  "name": "claude-macro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/check-workflows.mjs && node tests/dry-run.mjs"
+  }
+}

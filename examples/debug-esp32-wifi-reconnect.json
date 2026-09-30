@@ -1,0 +1,10 @@
+{
+  "symptom": "After the router reboots, the device never rejoins Wi-Fi; serial shows a wifi:reason 201 loop in 3 of 5 trials.",
+  "context": "ESP-IDF <version>, board <board>, reconnect logic in main/wifi.c.",
+  "repo": "<REPO>",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-wifi-reconnect",
+  "repro": "idf.py -p <PORT> flash monitor, then power-cycle the access point",
+  "exclusive": "the dev board on <PORT>: only one task may flash or monitor it",
+  "hypotheses": [ { "key": "brownout-on-tx", "statement": "The TX current spike trips brownout during reconnect", "exclusive": true } ],
+  "rules": "No OTA to any deployed device; the dev board only."
+}

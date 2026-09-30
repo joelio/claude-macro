@@ -1,8 +1,8 @@
 {
   "change": "Branch perf/<name>, commit <sha> in worktree <WT>: point the importmap pin at the vendor's minified build (git -C <WT> show <sha>).",
   "context": "The unminified vendor bundle is downloaded on every full page load with no-store. Package dir <PKG_DIR>.",
-  "workDir": "<HOME>/.local/share/<project>/<change>",
-  "qaAudience": "QA engineers with UI, Grafana and Sentry only (no kubectl)",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-<change>",
+  "qaAudience": "QA engineers with the UI and dashboards only (no cluster access)",
   "checks": [
     {
       "key": "bytes",

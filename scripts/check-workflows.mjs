@@ -3,12 +3,14 @@
 // meta.phases match both ways; the last phase runs on opus; the body compiles as an async
 // function; schemas carry the evidence tags and {source, quote, via} citations; prompts
 // include the SOURCES block (exa and context7 first); every agent() call sets effort.
-// Comments are stripped first so a comment cannot satisfy a rule.
+// The shared prelude (SOURCES, citation and objection schemas, helpers) must be identical in every
+// workflow, and prompts must not paste indented JSON. Comments are stripped first so a comment
+// cannot satisfy a rule.
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 const root = new URL('../', import.meta.url);
 const dir = new URL('workflows/', root);
-let bad = 0;
+let bad = 0; let shared = null;
 const fail = (f, m) => { console.log(`FAIL ${f}: ${m}`); bad++; };
 for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
   const src = fs.readFileSync(new URL(f, dir), 'utf8');
@@ -28,6 +30,11 @@ for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
     if (!/\['measured', 'code', 'sourced', 'inferred'\]/.test(code)) throw new Error('no evidence tag enum (measured, code, sourced, inferred)');
     if (!/required: \['source', 'quote', 'via'\]/.test(code)) throw new Error('no citation schema requiring source, quote and via');
     if (!/\$\{SOURCES\}/.test(code) || !/mcp__exa__/.test(code) || !/context7/.test(code)) throw new Error('prompts must include the SOURCES block (exa and context7 first)');
+    const block = src.match(/\/\/ --- shared:[\s\S]*?\/\/ --- end shared ---/);
+    if (!block) throw new Error('no shared prelude (// --- shared: ... // --- end shared ---)');
+    if (shared === null) shared = { f, text: block[0] };
+    else if (block[0] !== shared.text) throw new Error(`shared prelude differs from ${shared.f}; copy it exactly`);
+    if (/JSON\.stringify\([^)]*,\s*null\s*,\s*\d/.test(code)) throw new Error('indented JSON in a prompt costs tokens; use JSON.stringify(x)');
     const calls = code.split(/\bagent\(/).slice(1);
     calls.forEach((c, i) => {
       const opts = c.slice(0, c.search(/\bschema:/) + 1 || undefined);
@@ -42,10 +49,10 @@ for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
 // Harness: syntax only.
 const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e =>
   e.name === 'node_modules' ? [] : e.isDirectory() ? walk(`${d}/${e.name}`) : [`${d}/${e.name}`]);
-for (const p of walk(new URL('harness', root).pathname)) {
+for (const p of walk(new URL('packs', root).pathname)) {
   const cmd = p.endsWith('.mjs') ? ['node', ['--check', p]] : p.endsWith('.sh') ? ['bash', ['-n', p]] : null;
   if (!cmd) continue;
-  try { execFileSync(cmd[0], cmd[1], { stdio: 'pipe' }); console.log(`ok   ${p.slice(p.indexOf('harness/'))}`); }
-  catch (e) { fail(p.slice(p.indexOf('harness/')), String(e.stderr).split('\n')[0]); }
+  try { execFileSync(cmd[0], cmd[1], { stdio: 'pipe' }); console.log(`ok   ${p.slice(p.indexOf('packs/'))}`); }
+  catch (e) { fail(p.slice(p.indexOf('packs/')), String(e.stderr).split('\n')[0]); }
 }
 process.exit(bad ? 1 : 0);

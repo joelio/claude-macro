@@ -5,10 +5,12 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
 ## Layout
 
 - `workflows/*.js` — Workflow tool scripts. Inputs come from `args`; see `examples/` for real ones.
-- `harness/` — scripts the agents run (Playwright/CDP, Docker nginx, BigQuery). Installed by `scripts/install.sh`.
+- `packs/<name>/` — optional stack-specific harness, examples and LESSONS (e.g. `web-perf`). Installed with `scripts/install.sh --pack <name>`.
+- `improve/` and `scripts/improve.sh` — the bounded self-improvement loop and its backlog.
+- `tests/dry-run.mjs` — zero-token end-to-end run of every workflow against every example. `npm test` runs it with the checker.
 - `skills/macro/SKILL.md` — the trigger skill, symlinked from `~/.claude/skills/macro`. Keep it in step with the workflows, and refer to repo files by path relative to the repo, never an absolute path.
 - `scripts/install.sh` — per-developer install and `--check`. Anything a workflow or harness newly depends on goes in here and in README's Install section.
-- `scripts/check-workflows.mjs` — checks every workflow (pure meta, two-way phase match, Opus last, evidence tags, `{source, quote, via}` citations, the SOURCES block, effort on every agent) and syntax-checks the harness. Run `node scripts/check-workflows.mjs` after any edit.
+- `scripts/check-workflows.mjs` — checks every workflow (pure meta, two-way phase match, Opus last, evidence tags, `{source, quote, via}` citations, the SOURCES block, effort on every agent) and syntax-checks the harness. Run `npm test` after any edit.
 
 ## Writing workflows
 
@@ -21,7 +23,9 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
   - Adversary or final reviewer: `opus`, effort `high`. Opus is only for the stage that judges.
   - `args` may override any of these per task. Never make the adversary weaker than the workers, and don't raise worker effort above `medium` without a reason.
 - Keep a run under 10 agents unless the user asks for more.
-- Every worker returns a schema. Keep the evidence fields: tag (`measured`, `code`, `sourced`, `inferred`), evidence, citation with a verbatim quote.
+- Every worker returns a schema built from the shared prelude (`FACT`, `CITATIONS`, `OBJECTION`, `SAFE_CLAIMS`). The prelude between `// --- shared:` and `// --- end shared ---` must be byte-identical in every workflow; edit one, copy to all.
+- Every workflow has at least one example in `examples/` or a pack, named `<workflow>-*.json`, so the dry run covers it.
+- Adversary prompts carry compact JSON (`JSON.stringify(x)`), and verify's attackers get a slim view.
 - Keep workflows and harness scripts estate-neutral. Paths, hosts, tables, asset names, user agents, header names and dates go in `args`, environment variables, parameters or placeholders, never in the script.
 - exa and context7 are dependencies (installed at user scope by `scripts/install.sh`). Every workflow includes the `SOURCES` block telling agents to use them first, and every citation records `via`. Workflows must still finish with WebFetch or curl alone when those tools are rate-limited or missing.
 - Portability: this runs on other developers' machines against other repos. No absolute paths, usernames or machine-specific binaries; resolve the repo from the skill link, and the Claude binary and browsers from the environment.
@@ -37,7 +41,7 @@ These are what make the output trustworthy; don't write a workflow without them.
 ## Rules that go into every prompt
 
 - Read-only against live systems; light traffic; say how much was used.
-- Agents never edit or commit to the repo under study; the only exception is git-ignored build output in a change's worktree during change-evidence. Raw data goes outside it, under `~/.local/share/<project>/`.
+- Agents never edit, stash, reset or commit in the repo under study. Exceptions: git-ignored build output in a change's worktree during change-evidence, and disposable `git clone --local` copies under the run folder. Raw data goes to the run folder, `~/.local/share/macro/<project>/<date>-<slug>/`.
 - Local headless browsers only.
 - Cite primary sources: context7 for libraries, exa to find and fetch specs and docs, curl when they rate-limit.
 

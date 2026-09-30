@@ -1,0 +1,11 @@
+{
+  "topic": "`<cli> --help` takes about 1.8 s; where does the time go?",
+  "context": "Python CLI at <REPO> (entry point <module>:main), installed with pipx. Suspect: eager imports.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-cli-startup",
+  "streams": [
+    { "key": "import-time", "effort": "low", "prompt": "python -X importtime -c 'import <module>' n=10: top 15 modules by cumulative time, median and min-max. Save raw output." },
+    { "key": "code-map", "prompt": "Which imports on the --help path are eager and could be deferred? file:line for each, and what imports them." },
+    { "key": "history", "prompt": "git log -S and blame: when did startup get slow, and which commits added the heavy imports?" },
+    { "key": "packaging", "effort": "low", "prompt": "Entry-point shim overhead: time the console script vs python -m <module> --help, n=20 each." }
+  ]
+}

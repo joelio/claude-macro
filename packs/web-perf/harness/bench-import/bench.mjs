@@ -5,7 +5,7 @@ import fs from 'fs'; import os from 'os'; import {fileURLToPath} from 'url';
 import {start} from './server.mjs';
 
 const SEED=+(process.env.SEED||20260930), N=+(process.env.N||20), WARM=2, PORT=8933;
-const OUT=fileURLToPath(new URL('./raw.json',import.meta.url));
+const OUT=(process.env.OUT_DIR||'.')+'/raw.json'; // keep raw data outside any repo
 const EXE=process.env.CHROME_PATH; // unset: Playwright's bundled headless shell
 const CONDS={
   unthrottled:{cpu:1,net:null},

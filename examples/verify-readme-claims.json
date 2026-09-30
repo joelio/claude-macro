@@ -1,0 +1,11 @@
+{
+  "target": "The README at <REPO>/README.md (read it fully first)",
+  "context": "TypeScript library at <REPO>, read-only. Published as <package> on npm.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-verify-readme",
+  "groups": [
+    { "key": "api", "prompt": "Every documented function, option and default: does it match src/ at HEAD? Cite both." },
+    { "key": "compat", "effort": "low", "prompt": "Every support claim (Node versions, ESM/CJS, browsers) against package.json engines, exports and the CI matrix." },
+    { "key": "benchmarks", "prompt": "Re-run the README benchmark in a clone under the work dir, n=20; compare with the stated numbers, same units." }
+  ],
+  "logic": { "prompt": "Pay attention to comparisons with other libraries and any 'fastest' or 'zero-cost' wording." }
+}

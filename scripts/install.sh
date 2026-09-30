@@ -4,13 +4,13 @@
 #   scripts/install.sh              install what is missing
 #   scripts/install.sh --check      report only, change nothing
 #   scripts/install.sh --update-mcp also replace existing exa/context7 servers with the recommended config
-#   scripts/install.sh --no-harness skip npm and Playwright (workflows that only read and cite)
+#   scripts/install.sh --pack web-perf   also install a pack's harness (npm, Playwright); repeatable
 # Optional keys, read from the environment when set: EXA_API_KEY (lifts exa's free-tier rate limit),
 # CONTEXT7_API_KEY. Note that `claude mcp add` stores them in your user config (~/.claude.json).
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd); SKILL=macro
-CHECK=0; UPDATE=0; HARNESS=1
-for a in "$@"; do case $a in --check) CHECK=1;; --update-mcp) UPDATE=1;; --no-harness) HARNESS=0;; *) echo "unknown option $a"; exit 2;; esac; done
+CHECK=0; UPDATE=0; PACKS=()
+while [ $# -gt 0 ]; do case $1 in --check) CHECK=1;; --update-mcp) UPDATE=1;; --pack) PACKS+=("${2:?--pack needs a name}"); shift;; --no-harness) ;; *) echo "unknown option $1"; exit 2;; esac; shift; done
 EXA_TOOLS=web_search_exa,web_fetch_exa,get_code_context_exa,crawling_exa
 ok() { echo "  ok    $*"; }; todo() { echo "  todo  $*"; missing=1; }; missing=0
 run() { if [ $CHECK = 1 ]; then todo "$*"; else echo "  run   $*"; "$@" || { echo "  FAIL  $*"; missing=1; }; fi; }
@@ -20,7 +20,6 @@ echo "Prerequisites"
 CLAUDE=${CLAUDE_BIN:-$(command -v claude || true)}; [ -z "$CLAUDE" ] && [ -x "$HOME/.claude/local/claude" ] && CLAUDE="$HOME/.claude/local/claude"
 [ -n "$CLAUDE" ] && ok "claude $("$CLAUDE" --version 2>/dev/null | head -1)" || { echo "  FAIL  Claude Code CLI not found (set CLAUDE_BIN): https://docs.claude.com/en/docs/claude-code"; exit 1; }
 if command -v node >/dev/null && [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ]; then ok "node $(node -v)"; else echo "  FAIL  node 18+ is required"; exit 1; fi
-for t in docker bq gcloud; do command -v $t >/dev/null && ok "$t (optional)" || echo "  skip  $t not found (optional: only harness/nginx-headers and harness/bigquery need it)"; done
 
 echo "Skill"
 link="$HOME/.claude/skills/$SKILL"; want="$REPO/skills/$SKILL"
@@ -48,15 +47,23 @@ fi
 add_mcp exa "https://mcp.exa.ai/mcp?tools=$EXA_TOOLS${EXA_API_KEY:+&exaApiKey=$EXA_API_KEY}"
 add_mcp context7 "https://mcp.context7.com/mcp" ${CONTEXT7_API_KEY:+"CONTEXT7_API_KEY: $CONTEXT7_API_KEY"}
 
-if [ $HARNESS = 1 ]; then
-  echo "Harness"
-  if [ -d "$REPO/harness/node_modules/playwright" ]; then ok "harness npm packages"; else run npm --prefix "$REPO/harness" install; fi
-  if ls "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/Library/Caches/ms-playwright}"/chromium_headless_shell-* >/dev/null 2>&1 \
-     || ls "$HOME/.cache/ms-playwright"/chromium_headless_shell-* >/dev/null 2>&1; then ok "Playwright headless shell"
-  else run bash -c "cd '$REPO/harness' && npx playwright install chromium-headless-shell"; fi
-fi
+for pack in ${PACKS[@]+"${PACKS[@]}"}; do
+  dir="$REPO/packs/$pack"; echo "Pack $pack"
+  [ -d "$dir" ] || { echo "  FAIL  no pack $pack (have: $(ls "$REPO/packs" | tr '\n' ' '))"; missing=1; continue; }
+  if [ -f "$dir/harness/package.json" ]; then
+    if [ -d "$dir/harness/node_modules" ]; then ok "npm packages"; else run npm --prefix "$dir/harness" install; fi
+    if grep -q playwright "$dir/harness/package.json"; then
+      if ls "${PLAYWRIGHT_BROWSERS_PATH:-$HOME/Library/Caches/ms-playwright}"/chromium_headless_shell-* >/dev/null 2>&1 \
+         || ls "$HOME/.cache/ms-playwright"/chromium_headless_shell-* >/dev/null 2>&1; then ok "Playwright headless shell"
+      else run bash -c "cd '$dir/harness' && npx playwright install chromium-headless-shell"; fi
+    fi
+  fi
+  for t in $(sed -n 's/^optional-tools: //p' "$dir/README.md" 2>/dev/null); do
+    command -v "$t" >/dev/null && ok "$t" || echo "  skip  $t not found (only some of this pack's scripts need it)"
+  done
+done
 
 echo "Workflows"
-node "$REPO/scripts/check-workflows.mjs" | sed 's/^/  /'
+(cd "$REPO" && node scripts/check-workflows.mjs && node tests/dry-run.mjs) | sed 's/^/  /'
 [ $missing = 0 ] && echo "Ready." || echo "Some items need attention (see above)."
 exit $missing

@@ -1,7 +1,7 @@
 {
   "topic": "Per-page JS/CSS weight: ticket says every page loads data it doesn't need",
   "context": "Rails app at <REPO> (importmap, Stimulus, Turbo). Prod <PROD_URL>. Lead has established: /assets served no-store; eager controller loading pulls every library on every page.",
-  "workDir": "<HOME>/.local/share/<project>/page-weight",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-page-weight",
   "rules": "Prod: only unauthenticated GETs of the public login page and its assets, at most 8 page loads per stream.",
   "streams": [
     {

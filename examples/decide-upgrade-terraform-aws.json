@@ -1,0 +1,18 @@
+{
+  "question": "Move hashicorp/aws from <pinned> to 6.x now?",
+  "context": "Terraform <version> at <REPO>; one production and one staging workspace.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-aws-6x",
+  "repo": "<REPO>",
+  "kind": "upgrade",
+  "criteria": [
+    { "key": "plan-clean", "weight": "must", "measure": "terraform plan in a copy shows no replacements or destroys" },
+    { "key": "effort", "weight": "high", "measure": "files and resources that need edits" },
+    { "key": "advisories", "weight": "high", "measure": "open advisories or known regressions for the target version" }
+  ],
+  "options": [
+    { "key": "stay", "prompt": "Stay on <pinned>: support window, open advisories, what we lose by waiting." },
+    { "key": "upgrade-6x", "prompt": "Upgrade to the latest 6.x: breaking changes that touch our resources, and a plan in a copy." }
+  ],
+  "shared": [ { "key": "usage", "effort": "low", "prompt": "Every resource and data source type used, with file:line." } ],
+  "rules": "Only terraform init and plan with -lock=false against a copy; never apply; no state writes."
+}

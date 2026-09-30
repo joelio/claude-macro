@@ -1,69 +1,78 @@
 # macro
 
-A way of running an engineering investigation with Claude Code workflows: many cheap agents gather evidence in parallel, each claim is tagged by how it is known, and a stronger model tries to break the result before anyone acts on it.
+Evidence-based engineering investigations with Claude Code workflows. Many Sonnet agents gather evidence in parallel, and every claim is tagged by how it is known and cited with a verbatim quote. A stronger model (Opus) then tries to break the result before you act on it.
 
-It works on any codebase and question: performance, security posture, a config change, a library upgrade, "is this report right?". The examples come from a web performance investigation that went from "the page loads too much" to two evidence-backed PRs, a cited report and production traffic numbers in a day.
+It works on any codebase and question: a slow CLI, a flaky test, an ESP32 that won't reconnect, a Terraform provider upgrade, picking an identity provider, or "is this report right?".
 
 ```
- question / ticket
-        │
-        ▼
- ┌──────────────┐  4-6 Sonnet agents, one way of knowing each
- │ investigate  │  (network, CPU, code map, history, compat, usage)
- └──────┬───────┘  then an Opus sceptic re-checks the headline claims
-        │ report (you write it; agents gather)
-        ▼
- ┌──────────────┐  one Sonnet agent per claim group, quotes required
- │   verify     │  (specs, security, platform, codebase, data, logic)
- └──────┬───────┘  then Opus argues against each recommendation
-        │ corrected report, ranked options
-        ▼
- ┌──────────────┐  parallel checks (bytes, equivalence, build, platform)
- │change-evidence│ benchmark alone on a quiet machine
- └──────┬───────┘  Opus review writes safe PR claims, QA and engineer steps
-        │
-        ▼
- draft PR + preview-environment measurement (you run it)
+ question ──► investigate ──► decide / debug ──► change-evidence ──► verify the write-up
+              streams +       options or         checks + bench +    claim groups +
+              Opus sceptic    hypotheses +       Opus challenger     Opus logic + attackers
+                              Opus adversary
 ```
 
-## Install
-
-Needs Claude Code, Node 18+ and git. Docker and `bq`/`gcloud` are optional (only the nginx and BigQuery harnesses use them).
+## Quick start
 
 ```sh
-git clone <this repo> && cd <repo>
-export EXA_API_KEY=...        # optional: lifts exa's free-tier rate limit
-export CONTEXT7_API_KEY=...   # optional
-scripts/install.sh            # or --check to see what is missing, --no-harness to skip npm/Playwright
+git clone git@github.com:joelio/claude-macro.git ~/src/claude-macro
+export EXA_API_KEY=...           # optional: lifts exa's free-tier rate limit
+~/src/claude-macro/scripts/install.sh
 ```
 
-The installer is safe to re-run. It:
+Restart Claude Code. Then, in any repo, say **"macro it: <your question>"**. For a cheap first run that checks the install, say "macro it: run the smoke example". That runs `examples/investigate-smoke.json`: 3 agents at low effort.
 
-- links the skill into `~/.claude/skills/`;
-- adds the **exa** MCP server (web search, page fetch, code context) and the **context7** MCP server (library docs) at user scope, so they load in whichever repo you investigate;
-- installs the harness and Playwright's headless shell;
-- parse-checks the workflows.
+Needs Claude Code, Node 18+ and git. The installer is safe to re-run. It:
 
-It leaves MCP servers you already have alone unless you pass `--update-mcp`. Restart Claude Code afterwards.
+- links the skill;
+- adds the **exa** MCP server (search, fetch, code context) and **context7** (library docs) at user scope;
+- runs the tests.
 
-Every workflow prompt tells agents to use context7 for library behaviour, exa to find specs and vendor docs, `web_fetch_exa` for the exact text they quote and `get_code_context_exa` for real-world usage. Agents fall back to WebFetch or curl when a tool is rate-limited, and each citation records which one was used in `via`.
+Existing MCP servers are left alone unless you pass `--update-mcp`. Use `--check` to see what is missing, and `--pack web-perf` to add a pack's harness.
+
+## Workflows
+
+| Workflow | For | Shape | Agents |
+|---|---|---|---|
+| `investigate` | Understanding a problem or ticket | 4-6 evidence streams, then an Opus sceptic. The sceptic re-checks every finding the decision rests on, marks the rest `not-checked`, and names unanswered questions and alternative explanations | 5-7 |
+| `verify` | A report, README, PR or claim set | Claim groups with quote-required verdicts, then an Opus logic review and one attacker per recommendation. Adversaries get the verdicts in a slim form | 4-10 |
+| `change-evidence` | A committed change | Parallel checks and an optional clean benchmark (`process`, `browser`, `device`, `gpu`), then an Opus challenger that writes the claims safe to quote and the verification steps | 3-6 |
+| `debug` | A bug, crash, flaky test or regression | Reproduction plus competing hypotheses, parallel attempts to falsify each (serialised on a shared device), then an Opus adjudicator with a cited cause-to-symptom chain and a regression test | 4-8 |
+| `decide` | Choosing between options, or an upgrade | Evidence per option against fixed criteria (`kind: upgrade` adds breaking-change, advisory and build-in-a-clone checks), then an Opus attack on the leader and a ranking | 3-7 |
+
+Each workflow's `args` are documented at the top of its script; `examples/` has one or more per workflow. Results go to a run folder under `~/.local/share/macro/<project>/`, with a `REPORT.md` from `docs/report-template.md` and an entry in `~/.local/share/macro/INDEX.md`.
 
 ## Rules the agents follow
 
 - **Evidence tags.** Every claim is `measured`, `code`, `sourced` or `inferred`. A tag that overstates certainty is a defect.
-- **Citations.** A verdict needs a URL or `file:line` and a short verbatim quote. No quote, no "confirmed".
-- **Numbers.** Method, n, median with IQR or min-max. Say whether KB is 1,000 or 1,024.
-- **Safety.** Read-only against live systems, light traffic, no repo edits or commits by agents, raw data outside the repo. The one exception: change-evidence may create git-ignored build output in the change's worktree.
-- **Adversary last.** The strongest model reviews, and its job is to break things, not summarise.
-- **Models and effort.** Menial checks run on Sonnet at `low` effort, evidence workers on Sonnet at `medium`, and only the adversary on Opus at `high`. Effort is always set explicitly, because an omitted one inherits the session's. Override per task in `args` (`effort` on a stream, check or group; `workerModel`, `attackModel`, `reviewModel`, `sceptic.model`); the adversary is stronger than the workers by default and never weaker. In verify, give the `logic` group `"model": "opus", "effort": "high"`: it acts as an adversary.
+- **Citations.** Every claim carries at least one `{source, quote, via}`. No quote, no "confirmed". `via` records whether context7, exa, WebFetch or curl found it.
+- **Sources.** context7 for library behaviour, exa to find specs and vendor docs, `web_fetch_exa` for the exact text quoted, and curl when a tool is rate-limited.
+- **Numbers.** Method, n, median with IQR or min-max, and the unit.
+- **Safety.** Read-only against live systems with light traffic. Agents never edit, stash, reset or commit in the repo under study; code changes happen in disposable clones under the run folder.
+- **Adversary last, and held to the same standard.** An uncited blocker or serious objection is demoted to a question. Only `claims_safe_for_pr` sentences, each naming its evidence, go to other people.
+- **Cost tiers.** Sonnet at `low` effort for mechanical work and `medium` for evidence; Opus at `high` only for the adversary. Effort is always explicit (an omitted one inherits the session's), and adversary prompts carry compact JSON. Override models or effort in `args`, but never make the adversary weaker than the workers.
 
-## Running one
+## Self-improvement loop
 
-The `macro` skill (`skills/macro/SKILL.md`, linked by the installer) picks the right workflow and builds its args. From any repo, say "macro it" or "run the macro workflow on …". To drive a workflow by hand, ask Claude Code, for example:
+`scripts/improve.sh [n]` runs a bounded, Ralph-style loop on this repo, n iterations (3 by default):
 
-> Run the workflow at `<repo>/workflows/verify.js` with args from `<repo>/examples/verify-report.json`.
+1. Each iteration is a fresh headless Sonnet run. It takes the top item in `improve/BACKLOG.md`, does at most 5 context7 or exa lookups, makes the change, passes `npm test` and commits on an `improve/*` branch.
+2. An Opus run then reviews that commit and keeps or reverts it. A reverted item is blocked with the reviewer's reason.
+3. `MAX_USD_PER_RUN` (3 by default) caps each headless run's spend.
 
-or pass `scriptPath` and `args` to the Workflow tool directly. Examples in `examples/` are the real runs this was distilled from, with estate-specific paths left as placeholders.
+It never pushes; review with `git log -p main..HEAD`.
+
+`npm test` is the loop's pass/fail check, and it costs no tokens:
+
+- `scripts/check-workflows.mjs` statically checks each workflow: pure meta, both-way phase match, Opus last, the evidence-tag enum, `{source, quote, via}` citations, the identical shared prelude, effort on every agent, no indented JSON in prompts, and harness syntax.
+- `tests/dry-run.mjs` runs every workflow against every example with a stubbed `agent()`.
+
+## Packs
+
+Stack-specific harnesses live in `packs/<name>/` with their own examples and lessons. They are installed only on request.
+
+| Pack | What |
+|---|---|
+| `packs/web-perf/` | Playwright and CDP profiling, an A/B import benchmark, an nginx header test in Docker, and a load-balancer log query |
 
 ## Cost seen in practice
 
@@ -72,29 +81,21 @@ or pass `scriptPath` and `args` to the Workflow tool directly. Examples in `exam
 | investigate (6 streams + sceptic) | 7 | 467k | 6.6 min |
 | verify (7 groups + 2 attacks, 123 claims) | 9 | 896k | 7.1 min |
 | change-evidence (3 checks + benchmark + Opus) | 5 | 321k | 12.1 min |
-| mobile analysis (3 + Opus review) | 4 | 323k | 6.4 min |
-| config-change verify (5 + Opus attack, BigQuery) | 6 | 528k | 9.1 min |
+| config-change verify (5 + Opus attack) | 6 | 528k | 9.1 min |
 
-Keep a run under 10 agents unless asked. Scope each agent to one question.
+These runs predate v0.2's compact adversary payloads, which should cut Attack-phase input by roughly 40% (estimate, not yet measured). Keep a run under 10 agents unless asked, and scope each agent to one question.
 
-## What's here
+## Layout
 
 | Path | What |
 |---|---|
-| `workflows/investigate.js` | Evidence streams, then a sceptic |
-| `workflows/verify.js` | Cited claim checks, then adversaries per recommendation |
-| `workflows/change-evidence.js` | Checks, optional clean benchmark, Opus review with PR claims and QA steps |
-| `examples/` | `args` for each workflow from real runs |
-| `harness/browser/` | Playwright + CDP scripts: cold-load profile, real warm-cache test, throttled WebView emulation. Settings come from env (`ASSET_MATCH`, `ASSET_PREFIX`, `EMBED_HEADER`, `WEBVIEW_UA`, `OUT_DIR`) and each output records browser, OS, CPU and load |
-| `harness/bench-import/` | A/B module import benchmark: fresh browser per run, seeded interleave, bootstrap CI |
-| `harness/nginx-headers/` | Run your nginx configs in Docker against a stand-in upstream and assert status and headers from a cases file |
-| `harness/bigquery/` | Parameterised load-balancer log query: downloads and bytes of one asset by client type |
-| `skills/macro/` | Claude Code skill that triggers the workflows (link into `~/.claude/skills/`) |
-| `docs/citations.md` | Evidence tags, quote-required citations, the source ladder, fetching when tools fail |
-| `docs/adversarial.md` | Sceptic, logic reviewer, attackers and challenger: when to use each and what they caught |
-| `LESSONS.md` | Traps that cost time, and how the agents did |
-| `CLAUDE.md` | Conventions for editing this repo (`AGENTS.md` links to it) |
-| `scripts/install.sh` | Per-developer install and `--check`: skill link, exa and context7 MCP servers, harness |
-| `scripts/check-workflows.mjs` | Checks each workflow (pure meta, two-way phase match, Opus last, evidence tags, `{source, quote, via}` citations, exa and context7 in prompts, effort on every agent) and syntax-checks the harness |
-
-Browser scripts use Playwright's headless shell, or `CHROME_PATH` if set. Each script's header comment lists its arguments and environment variables.
+| `workflows/` | The five workflow scripts |
+| `examples/` | Example `args`, named `<workflow>-*.json` |
+| `skills/macro/` | The trigger skill (linked by the installer) |
+| `docs/` | Citation method, adversarial method, report template |
+| `packs/` | Optional stack-specific harnesses |
+| `improve/` | Self-improvement prompt, review prompt and backlog |
+| `scripts/` | `install.sh`, `improve.sh`, `check-workflows.mjs` |
+| `tests/dry-run.mjs` | Zero-token end-to-end run of every workflow and example |
+| `LESSONS.md` | General traps and how the agents did |
+| `CHANGELOG.md` | Versions |

@@ -1,0 +1,12 @@
+{
+  "symptom": "tests/test_train.py::test_resume fails about 1 in 10 on CI, never locally.",
+  "context": "Python <version>, pytest with xdist on CI (-n 4). The test writes a checkpoint and resumes from it.",
+  "repo": "<REPO>",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-flaky-resume",
+  "repro": "pytest -p no:randomly tests/test_train.py -x --count 30 (pytest-repeat), and again with -n 4",
+  "hypotheses": [
+    { "key": "tmp-collision", "statement": "Workers under xdist share a checkpoint path and overwrite each other" },
+    { "key": "unseeded-workers", "statement": "DataLoader workers are not seeded, so resumed batches differ" }
+  ],
+  "maxHypotheses": 4
+}

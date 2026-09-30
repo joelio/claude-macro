@@ -1,0 +1,10 @@
+{
+  "topic": "Smoke test: how many agent() calls does each macro workflow make, and does context7 document Playwright's page.route cache behaviour?",
+  "context": "The macro repo at <MACRO_REPO>, read-only. This is a cheap run to check the install: exa, context7 and a workflow run end to end.",
+  "workDir": "<HOME>/.local/share/macro/macro/<runId>-smoke",
+  "streams": [
+    { "key": "count", "effort": "low", "prompt": "Count agent( calls in each file under <MACRO_REPO>/workflows/. Cite file:line for each." },
+    { "key": "docs", "effort": "low", "prompt": "Using context7, find what the Playwright docs say about page.route and the HTTP cache. Quote it." }
+  ],
+  "sceptic": { "effort": "low", "minClaims": 4 }
+}

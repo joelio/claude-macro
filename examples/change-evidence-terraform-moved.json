@@ -1,0 +1,10 @@
+{
+  "change": "Branch refactor/<name>, commit <sha> in <REPO>: split modules/<x> into two modules with moved blocks (git -C <REPO> show <sha>).",
+  "context": "Terraform <version>, AWS provider <version>. The refactor must not replace or destroy anything.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-tf-moved",
+  "rules": "Only terraform init and plan with -lock=false in a copy of the repo under the work dir, using read-only credentials. Never apply; no state writes.",
+  "checks": [
+    { "key": "plan", "effort": "low", "prompt": "terraform plan -refresh=false on the change: quote the summary line; it must be 0 to add, 0 to change, 0 to destroy." },
+    { "key": "moved-blocks", "prompt": "Every resource address that changed has a moved block; list old -> new with file:line, and any address with none." }
+  ]
+}

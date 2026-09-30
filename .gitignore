@@ -1,5 +1,6 @@
 node_modules/
 *.har
+improve/BACKLOG.md.tmp
 raw.json
 results.json
 results.md

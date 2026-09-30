@@ -1,5 +1,6 @@
 import fs from 'fs';
-const raw=JSON.parse(fs.readFileSync(new URL('./raw.json',import.meta.url)));
+const DIR=process.env.OUT_DIR||'.'; // same OUT_DIR as bench.mjs
+const raw=JSON.parse(fs.readFileSync(DIR+'/raw.json'));
 function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 const q=(s,p)=>{const i=(s.length-1)*p,l=Math.floor(i),h=Math.ceil(i);return s[l]+(s[h]-s[l])*(i-l);};
 const sorted=a=>[...a].sort((x,y)=>x-y);
@@ -25,5 +26,5 @@ for(const mode of ['plain','trace'])for(const cond of ['unthrottled','cpu4x','ne
   md+=`| ${mode} | ${cond} | ${m} | ${s(sa)} | ${s(sb)} | ${f(dm,d)} [${f(lo,d)}, ${f(hi,d)}] | ${p<1e-4?'<1e-4':p.toFixed(4)} | ${f(q(sb,.5)/q(sa,.5),2)} |\n`;
   res.push({mode,cond,m,n:sa.length,full:sa,min:sb,dm,lo,hi,p});
 }
-fs.writeFileSync(new URL('./results.md',import.meta.url),md);fs.writeFileSync(new URL('./results.json',import.meta.url),JSON.stringify(res));
+fs.writeFileSync(DIR+'/results.md',md);fs.writeFileSync(DIR+'/results.json',JSON.stringify(res));
 console.log(md);

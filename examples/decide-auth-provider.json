@@ -1,0 +1,17 @@
+{
+  "question": "Which identity provider for <app>: keep <current>, move to Zitadel, or Keycloak?",
+  "context": "Small team, self-hosted on Kubernetes, needs OIDC for web and machine-to-machine tokens; SPIFFE for workloads already.",
+  "workDir": "<HOME>/.local/share/macro/<project>/<runId>-idp",
+  "kind": "research",
+  "criteria": [
+    { "key": "oidc-m2m", "weight": "must", "measure": "OIDC for users plus client-credentials or token exchange for services" },
+    { "key": "ops-burden", "weight": "high", "measure": "components to run, upgrade cadence, backup and restore story" },
+    { "key": "security-record", "weight": "high", "measure": "advisories in the last 24 months and time to fix" },
+    { "key": "cost", "weight": "low", "measure": "licence and hosting cost at our size" }
+  ],
+  "options": [
+    { "key": "stay", "prompt": "Keep <current>: what it lacks against the criteria." },
+    { "key": "zitadel", "prompt": "Zitadel, self-hosted." },
+    { "key": "keycloak", "prompt": "Keycloak, self-hosted." }
+  ]
+}
