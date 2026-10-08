@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Mechanical passes run on Haiku 5.5: the quote check, recheck, and any stream, group, check or option given `"effort": "low"` without a model (`workerFor()` in the shared prelude; `mechanicalModel` overrides). Verify's inventory, the benchmark and debug stay on Sonnet. The CLI-startup timing streams, the page-weight network stream and the agent-config permissions group are pinned to Sonnet because they need judgement.
+
 - Eval pilot (evals/results/2026-10-01-pilot.md): all arms pass the report tasks, so they're ceiling and regression checks. B costs about 5 times A and C about 2 times. Tier 0 is refocused on cluck-docs and debug-22, to run from a clean session.
 - The citation schema says a quote is verbatim source text and arithmetic goes in `evidence`; recomputations cite their saved output.
 

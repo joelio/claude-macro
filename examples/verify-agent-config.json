@@ -18,6 +18,7 @@
     },
     {
       "key": "permissions",
+      "model": "sonnet",
       "effort": "low",
       "prompt": "Tabulate what an agent can do here without a prompt: tools, paths, commands and network, as a least-privilege inventory."
     }

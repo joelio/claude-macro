@@ -27,9 +27,9 @@ for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
     const called = [...code.matchAll(/\bphase\((['"`])([^'"`]+)\1\)/g)].map(x => x[2]);
     for (const t of called) if (!titles.includes(t)) throw new Error(`phase('${t}') is not in meta.phases`);
     for (const t of titles) if (!called.includes(t)) throw new Error(`meta phase '${t}' has no phase() call`);
-    // The adversary phase is last, except for an optional mechanical Recheck phase on sonnet after it.
+    // The adversary phase is last, except for an optional mechanical Recheck phase on haiku after it.
     const ph = m.phases || [], trailing = ph.at(-1)?.title === 'Recheck';
-    if (trailing && ph.at(-1).model !== 'sonnet') throw new Error('a trailing Recheck phase is mechanical: model sonnet');
+    if (trailing && ph.at(-1).model !== 'haiku') throw new Error('a trailing Recheck phase is mechanical: model haiku');
     if (ph.at(trailing ? -2 : -1)?.model !== 'opus') throw new Error('the adversary phase must be last (before any Recheck) and on opus');
     if (!/\['measured', 'code', 'sourced', 'inferred'\]/.test(code)) throw new Error('no evidence tag enum (measured, code, sourced, inferred)');
     if (!/required: \['source', 'quote', 'via'\]/.test(code)) throw new Error('no citation schema requiring source, quote and via');

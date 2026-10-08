@@ -19,7 +19,7 @@ Reusable Claude Code workflows for evidence-based engineering investigations, pl
 - No `Date.now()`, `Math.random()` or `new Date()` anywhere; they break resume. Pass timestamps and seeds in `args`.
 - Default to `parallel()` for independent streams and one barrier before the sceptic or adversary, which need everything together.
 - Models and effort are tiered to balance quality against token quota. Always set `effort`: an omitted effort inherits the session's, which may be high.
-  - Mechanical work (counting bytes, re-checking file:line, running a build, re-deriving numbers): `sonnet`, effort `low`.
+  - Mechanical work (counting bytes, re-checking file:line, running a build, re-deriving numbers, the quote check, recheck): `haiku`, effort `low`. The shared prelude's `workerFor()` sends any stream, group, check or option given effort `low` and no model to `MECH` (`args.mechanicalModel`, default `haiku`). Give a low-effort task `"model": "sonnet"` when the measurement has traps that need judgement (CDP request counting, timings with statistics, security inventories); verify's inventory stays on Sonnet because a missed claim is never checked.
   - Evidence workers (measuring, reading code, finding sources): `sonnet`, effort `medium`.
   - Adversary or final reviewer: `opus`, effort `high`. Opus is only for the stage that judges.
   - `args.profile` sets the defaults for a whole run:

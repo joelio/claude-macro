@@ -20,7 +20,7 @@ export const meta = {
 //   maxHypotheses?: 5,                                     // total tested, including yours
 //   exclusive?: 'a resource only one test may use at a time, e.g. the ESP32 on /dev/cu.usbserial-0001, the one GPU, port 5432',
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools',
-//   workerModel?: 'sonnet', judgeModel?: 'opus', judgeEffort?: 'high'
+//   workerModel?: 'sonnet', judgeModel?: 'opus', judgeEffort?: 'high'   // debug has no mechanical stage
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
@@ -125,6 +125,11 @@ const RECHECK = { type: 'object', properties: { items: { type: 'array', items: {
   item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
   evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
 const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
+// Models. Mechanical passes (the quote check, recheck, and any stream, group, check or option given effort 'low'
+// without a model) run on Haiku; evidence work on Sonnet; the adversary on Opus. args.mechanicalModel and
+// args.workerModel override the first two; a model set on a single task wins.
+const MECH = A.mechanicalModel || 'haiku'
+const workerFor = t => t.model || (t.effort === 'low' ? MECH : A.workerModel || 'sonnet')
 // --- end shared ---
 uniqueKeys(A.hypotheses, 'hypothesis')
 

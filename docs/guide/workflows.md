@@ -39,8 +39,8 @@ Do not use it when you already have a hypothesis to test (`debug`), a finished w
 
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
-| Measure | one per stream, in parallel | `streams[].model`, else `workerModel`, else `sonnet` | `streams[].effort`, else work |
-| Quotes | the quote check (skip with `quoteCheck: false`) | `workerModel`, else `sonnet` | `low` |
+| Measure | one per stream, in parallel | `streams[].model`, else `mechanicalModel` (default `haiku`) for a `low` stream, else `workerModel`, else `sonnet` | `streams[].effort`, else work |
+| Quotes | the quote check (skip with `quoteCheck: false`) | `mechanicalModel`, else `haiku` | `low` |
 | Challenge | the sceptic | `sceptic.model`, else `opus` | `sceptic.effort`, else judge |
 
 The quote check finds each citation's quote in its source (the saved copy, the file at the commit, or the URL) and marks findings whose quote wasn't found (`quote_check: not-found`, `wrong-line` or `source-missing`). A missing source is reported, never counted as found. The sceptic re-checks those before upholding them.
@@ -56,7 +56,7 @@ The sceptic first lists the sub-questions the topic implies and marks which no s
 | `workDir` | yes | Absolute directory for raw data |
 | `streams` | yes | `[{ key, prompt, model?, effort? }]`. Four to six, each a different way of knowing. `"effort": "low"` for mechanical ones |
 | `sceptic` | no | `{ model?, effort?, minClaims? }`; defaults `opus`, judge, 12 |
-| `workerModel` | no | Default model for streams; `sonnet` |
+| `workerModel`, `mechanicalModel` | no | Default models for streams (`sonnet`) and for the quote check and `low` streams (`haiku`) |
 | `rules`, `tools`, `profile` | no | As above |
 
 ### Example
@@ -109,8 +109,8 @@ Do not use it to gather new evidence about a system; that is `investigate`. Do n
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
 | Inventory | one agent lists every checkable claim and assigns each to exactly one group (skip with `inventory: false`) | `workerModel`, else `sonnet` | `low` |
-| Verify | one per group, in parallel; each must return a verdict for every claim it was given | `groups[].model`, else `workerModel`, else `sonnet` | `groups[].effort`, else work |
-| Quotes | the quote check (skip with `quoteCheck: false`) | `workerModel`, else `sonnet` | `low` |
+| Verify | one per group, in parallel; each must return a verdict for every claim it was given | `groups[].model`, else `mechanicalModel` (default `haiku`) for a `low` group, else `workerModel`, else `sonnet` | `groups[].effort`, else work |
+| Quotes | the quote check (skip with `quoteCheck: false`) | `mechanicalModel`, else `haiku` | `low` |
 | Attack | the logic review, plus one attacker per entry in `attacks`, in parallel | logic: `logic.model`, else `attackModel`, else `opus`; attackers: `attackModel`, else `opus` | logic: `logic.effort`, else judge; attackers: `attacks[].effort`, else judge |
 
 The logic review always runs, even with no `attacks`. It works from the groups' verdicts: for each conclusion in the target, its premises and their verdicts, whether it follows, hidden assumptions, confounders, missing alternatives, and tags stronger than the evidence. Each attacker argues against one recommendation as hard as it honestly can. Attackers and the logic review get a slim view of the verdicts: quotes stay where a wrong one would matter (disputed claims, and confirmed measured or code claims), other confirmed claims keep only their sources. An attack's `groups` limits which groups it sees with quotes; it still sees the rest without them.
@@ -127,7 +127,7 @@ The logic review always runs, even with no `attacks`. It works from the groups' 
 | `inventory`, `quoteCheck` | no | Both default on; `false` skips the stage |
 | `recheck` | no | Default off. When on, a mechanical agent re-opens the citations behind the adversaries' blocker and serious objections and their safe claims, after the attack |
 | `attacks` | no | `[{ key, prompt, effort?, groups? }]`, one per recommendation. `groups` must name existing group keys; it cuts that attacker's input by about 29% when limited to one of four groups, and every other group's claims still arrive without quotes |
-| `workerModel`, `attackModel` | no | Defaults `sonnet` and `opus` |
+| `workerModel`, `mechanicalModel`, `attackModel` | no | Defaults `sonnet`, `haiku` (quote check, recheck, `low` groups) and `opus`. Inventory stays on `workerModel`: a claim it misses is never checked |
 | `rules`, `tools`, `profile` | no | As above |
 
 ### Example
@@ -180,10 +180,10 @@ Do not use it on an uncommitted diff, or when the question is still "what should
 
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
-| Check | one per check, in parallel | `workerModel`, else `sonnet` | `checks[].effort`, else work |
+| Check | one per check, in parallel | `checks[].model`, else `mechanicalModel` (default `haiku`) for a `low` check, else `workerModel`, else `sonnet` | `checks[].effort`, else work |
 | Benchmark | one, only if `benchmark` is given; it runs alone so timings are clean | `workerModel`, else `sonnet` | `benchmark.effort`, else work |
 | Challenge | the reviewer | `reviewModel`, else `opus` | `reviewEffort`, else judge |
-| Recheck | optional (`recheck: true`): re-opens the citations behind the reviewer's blocker and serious objections and its safe claims | `workerModel`, else `sonnet` | `low` |
+| Recheck | optional (`recheck: true`): re-opens the citations behind the reviewer's blocker and serious objections and its safe claims | `mechanicalModel`, else `haiku` | `low` |
 
 The benchmark agent gets design rules by `kind`: `process` (hyperfine or equivalent, warm-ups discarded, fresh process per run), `browser` (fresh browser process per run), `device` (n boots or cycles on the same power source, timestamps from the serial log, one test at a time) or `gpu` (discard first runs, pin clocks, record driver and firmware versions). All kinds interleave arms in a seeded shuffle, n of at least 20 per arm per condition, and report median, IQR, min-max and a bootstrap 95% CI of the median difference.
 
@@ -196,11 +196,11 @@ In the change's worktree, agents may create only build output that git ignores.
 | `change` | yes | Branch, commit and a one-line summary; how to read the diff |
 | `context` | yes | Why, what is measured already, paths |
 | `workDir` | yes | Absolute directory for scripts and raw data |
-| `checks` | yes | `[{ key, prompt, effort? }]`; `low` for mechanical checks |
+| `checks` | yes | `[{ key, prompt, model?, effort? }]`; `low` for mechanical checks, which then run on Haiku |
 | `benchmark` | no | `{ prompt, kind?, effort? }`; `kind` is `process` (default), `browser`, `device` or `gpu`. Omit when timing is not the question |
 | `qaAudience` | no | Who verifies and with what; default "the developer, locally" |
 | `recheck` | no | Default off; see Stages |
-| `workerModel`, `reviewModel`, `reviewEffort` | no | Defaults `sonnet`, `opus`, judge |
+| `workerModel`, `mechanicalModel`, `reviewModel`, `reviewEffort` | no | Defaults `sonnet`, `haiku` (recheck, `low` checks), `opus`, judge |
 | `rules`, `tools`, `profile` | no | As above |
 
 ### Example
@@ -324,7 +324,7 @@ Do not use it with a single option or without the status quo; the script require
 
 | Phase | Agents | Model | Effort |
 |---|---|---|---|
-| Evidence | one per option, plus one per shared stream, all in parallel | `workerModel`, else `sonnet` | `options[].effort` or `shared[].effort`, else work |
+| Evidence | one per option, plus one per shared stream, all in parallel | `model`, else `mechanicalModel` (default `haiku`) when its effort is `low`, else `workerModel`, else `sonnet` | `options[].effort` or `shared[].effort`, else work |
 | Attack | the adversary | `attackModel`, else `opus` | `attackEffort`, else judge |
 
 Each option agent rates only its option against every criterion and looks hardest for its dealbreakers. Shared streams gather option-independent evidence, such as a usage map of the dependency. With `kind: "upgrade"` every agent is also told to read the pinned version from the lockfile, quote every breaking change and deprecation between pinned and target, grep the repo for each affected API, check runtime and toolchain minimums and transitive conflicts, check advisories for both versions, and, if safe, install the target in a clone and run the build and tests.
@@ -339,11 +339,11 @@ The adversary names the leader, argues against it, steelmans the runner-up and t
 | `context` | yes | Stack, pinned versions, constraints, what matters and what does not |
 | `workDir` | yes | Absolute directory for clones, fetched sources and raw data |
 | `criteria` | yes | `[{ key, weight, measure }]`; `weight` is `must`, `high` or `low` (default `high`) |
-| `options` | yes | `[{ key, prompt, effort? }]`, two to four, always including the status quo |
+| `options` | yes | `[{ key, prompt, model?, effort? }]`, two to four, always including the status quo |
 | `repo` | no | Absolute path of the repo the decision affects; read-only |
 | `kind` | no | `research` or `upgrade` |
-| `shared` | no | `[{ key, prompt, effort? }]`, option-independent streams |
-| `workerModel`, `attackModel`, `attackEffort` | no | Defaults `sonnet`, `opus`, judge |
+| `shared` | no | `[{ key, prompt, model?, effort? }]`, option-independent streams |
+| `workerModel`, `mechanicalModel`, `attackModel`, `attackEffort` | no | Defaults `sonnet`, `haiku` (`low` options and streams), `opus`, judge |
 | `rules`, `tools`, `profile` | no | As above |
 
 ### Example

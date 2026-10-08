@@ -15,10 +15,10 @@ export const meta = {
 //   repo?: '/abs/path of the repo the decision affects (read-only)',
 //   kind?: 'research' | 'upgrade',     // 'upgrade' adds breaking-change, advisory and build-in-a-clone checks
 //   criteria: [{ key, weight: 'must' | 'high' | 'low', measure }],
-//   options: [{ key, prompt, effort? }],   // 2-4, always including the status quo
-//   shared?: [{ key, prompt, effort? }],   // option-independent streams, e.g. a usage map of the dependency
+//   options: [{ key, prompt, model?, effort? }],   // 2-4, always including the status quo
+//   shared?: [{ key, prompt, model?, effort? }],   // option-independent streams, e.g. a usage map of the dependency
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools',
-//   workerModel?: 'sonnet', attackModel?: 'opus', attackEffort?: 'high'
+//   workerModel?: 'sonnet', mechanicalModel?: 'haiku', attackModel?: 'opus', attackEffort?: 'high'   // mechanicalModel: effort-'low' options and streams
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
@@ -124,6 +124,11 @@ const RECHECK = { type: 'object', properties: { items: { type: 'array', items: {
   item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
   evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
 const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
+// Models. Mechanical passes (the quote check, recheck, and any stream, group, check or option given effort 'low'
+// without a model) run on Haiku; evidence work on Sonnet; the adversary on Opus. args.mechanicalModel and
+// args.workerModel override the first two; a model set on a single task wins.
+const MECH = A.mechanicalModel || 'haiku'
+const workerFor = t => t.model || (t.effort === 'low' ? MECH : A.workerModel || 'sonnet')
 // --- end shared ---
 uniqueKeys(A.options, 'option'); uniqueKeys(A.shared, 'shared stream')
 
@@ -167,11 +172,11 @@ const STREAM = { type: 'object', properties: {
 phase('Evidence'); mark('Evidence')
 const optionTasks = A.options.map(o => () =>
   agent(`${BASE}\n\nOption "${o.key}": ${o.prompt}\nRate this option, and only this option, against every criterion. Look hardest for its dealbreakers.`,
-    { label: `option:${o.key}`, phase: 'Evidence', model: W, effort: o.effort || E.work, schema: withUsed(OPTION) })
+    { label: `option:${o.key}`, phase: 'Evidence', model: workerFor(o), effort: o.effort || E.work, schema: withUsed(OPTION) })
     .then(r => r && { ...r, option: o.key }))
 const sharedTasks = (A.shared || []).map(s => () =>
   agent(`${BASE}\n\nShared stream "${s.key}" (applies to every option): ${s.prompt}`,
-    { label: `shared:${s.key}`, phase: 'Evidence', model: W, effort: s.effort || E.work, schema: withUsed(STREAM) })
+    { label: `shared:${s.key}`, phase: 'Evidence', model: workerFor(s), effort: s.effort || E.work, schema: withUsed(STREAM) })
     .then(r => r && { ...r, stream: s.key }))
 const got = (await parallel([...optionTasks, ...sharedTasks])).filter(Boolean)
 const options = got.filter(g => g.option), shared = got.filter(g => g.stream)

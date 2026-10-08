@@ -4,7 +4,7 @@ Claude Code workflows for engineering investigations that rest on evidence. You 
 
 ## Why it is different
 
-- **Parallel, cited evidence.** Several Sonnet agents each take one way of knowing: measure it, read the code, read the history, read the spec. Every claim is tagged `measured`, `code`, `sourced` or `inferred` and carries a citation with a verbatim quote. No quote, no "confirmed": the scripts demote uncited verdicts rather than trust them.
+- **Parallel, cited evidence.** Several Sonnet agents (Haiku for the mechanical ones) each take one way of knowing: measure it, read the code, read the history, read the spec. Every claim is tagged `measured`, `code`, `sourced` or `inferred` and carries a citation with a verbatim quote. No quote, no "confirmed": the scripts demote uncited verdicts rather than trust them.
 - **Then an adversary.** Every run ends with an Opus agent whose only job is to break the result: a sceptic that re-checks findings by id, a logic reviewer, an attacker per recommendation, a change challenger or a debug adjudicator. It is held to the same standard: an objection without a citation becomes a question.
 - **Only what survives is quotable.** The adversary's `claims_safe_for_pr` sentences, each naming its evidence, are the only ones meant for a PR, commit or report summary.
 
@@ -53,7 +53,7 @@ A real example: a `verify` run over a Rust CLI's README and getting-started guid
 
 ## Cost and effort
 
-Models and effort are tiered. Sonnet does the evidence work (`low` for mechanical tasks such as counts and builds, `medium` otherwise); Opus at `high` judges. `"profile"` in `args` shifts the whole run:
+Models and effort are tiered. Haiku at `low` does the mechanical passes: the quote check, recheck, and any stream, group, check or option you mark `"effort": "low"` (counts, builds, file:line re-checks). Sonnet at `medium` does the evidence work, and Opus at `high` judges. Pin a low-effort task to `"model": "sonnet"` when it needs judgement; `mechanicalModel` and `workerModel` change the defaults. `"profile"` in `args` shifts the whole run:
 
 | Profile | Workers | Adversary | For |
 |---|---|---|---|

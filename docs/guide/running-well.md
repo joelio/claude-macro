@@ -25,7 +25,7 @@ Every agent has an explicit effort, because an omitted one inherits the session'
 Three rules apply on top of the profile:
 
 - An `effort` on a single stream, group, check, option or attack overrides it. Give mechanical tasks (counts, byte sizes, file:line re-checks, builds) `"effort": "low"` whatever the profile.
-- Change models only when you have a reason, and never make the adversary weaker than the workers. `workerModel`, `attackModel`, `reviewModel`, `judgeModel` and per-stream `model` exist for that.
+- Change models only when you have a reason, and never make the adversary weaker than the workers. `workerModel`, `mechanicalModel`, `attackModel`, `reviewModel`, `judgeModel` and per-stream `model` exist for that. A `low` task that needs judgement (request counting in a browser, timing with statistics, a security inventory) should say `"model": "sonnet"`, or it runs on Haiku.
 - An unknown profile name is rejected before any agent runs.
 
 ## Estimate before you spend
@@ -37,9 +37,9 @@ node <REPO>/tests/dry-run.mjs --estimate <workDir>/args.json <workflow>
 This runs the workflow with a stubbed `agent()` and costs no tokens. It lists every agent with its model and effort, and it validates the args: a missing required field, a relative `workDir`, duplicate keys, an unknown profile or an attack naming a group that does not exist all fail here rather than mid-run. For example:
 
 ```
-verify: 4 agents (2 sonnet/medium, 1 sonnet/low, 1 opus/high)
+verify: 4 agents (2 sonnet/medium, 1 haiku/low, 1 opus/high)
   verify:api: sonnet/medium
-  verify:compat: sonnet/low
+  verify:compat: haiku/low
   verify:benchmarks: sonnet/medium
   logic: opus/high
 ```

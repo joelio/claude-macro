@@ -7,6 +7,7 @@
     {
       "key": "network",
       "prompt": "Cold x3 and warm reload x2 of the login page: every request with origin, size, cache-control, served-from-cache. Break totals down by source, top 10 by bytes. Save HAR.",
+      "model": "sonnet",
       "effort": "low"
     },
     {

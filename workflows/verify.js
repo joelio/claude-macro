@@ -5,9 +5,9 @@ export const meta = {
   phases: [
     { title: 'Inventory', detail: 'list every checkable claim and assign each to one group', model: 'sonnet' },
     { title: 'Verify', detail: 'one agent per claim group, quotes required', model: 'sonnet' },
-    { title: 'Quotes', detail: 'mechanical check that every quote is in its source', model: 'sonnet' },
+    { title: 'Quotes', detail: 'mechanical check that every quote is in its source', model: 'haiku' },
     { title: 'Attack', detail: 'logic review plus one attacker per recommendation, all given the verdicts', model: 'opus' },
-    { title: 'Recheck', detail: 'optional: re-open the adversaries\' citations', model: 'sonnet' },
+    { title: 'Recheck', detail: 'optional: re-open the adversaries\' citations', model: 'haiku' },
   ],
 }
 
@@ -21,7 +21,7 @@ export const meta = {
 //   attacks?: [{ key, prompt, effort?, groups? }],  // one per recommendation; groups limits which verdicts it reads (all by default)
 //   inventory?: true,                             // one agent lists every claim and assigns it to a group; false to skip
 //   quoteCheck?: true, recheck?: false,           // mechanical quote check before the attack; recheck of the adversaries after
-//   workerModel?: 'sonnet', attackModel?: 'opus'
+//   workerModel?: 'sonnet', mechanicalModel?: 'haiku', attackModel?: 'opus'   // mechanicalModel: quote check, recheck, effort-'low' groups
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
@@ -128,6 +128,11 @@ const RECHECK = { type: 'object', properties: { items: { type: 'array', items: {
   item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
   evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
 const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
+// Models. Mechanical passes (the quote check, recheck, and any stream, group, check or option given effort 'low'
+// without a model) run on Haiku; evidence work on Sonnet; the adversary on Opus. args.mechanicalModel and
+// args.workerModel override the first two; a model set on a single task wins.
+const MECH = A.mechanicalModel || 'haiku'
+const workerFor = t => t.model || (t.effort === 'low' ? MECH : A.workerModel || 'sonnet')
 // --- end shared ---
 uniqueKeys(A.groups, 'group'); uniqueKeys(A.attacks, 'attack')
 
@@ -168,7 +173,7 @@ const assigned = k => ((inventory && inventory.claims) || []).filter(c => c.grou
 
 phase('Verify'); mark('Verify')
 const verified = (await parallel(A.groups.map(g => () =>
-  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}${inventory ? `\nYour claims (return a verdict for every id, keeping the id exactly; add any others you find in your topic with new ids):\n${JSON.stringify(assigned(g.key))}` : ''}`, { label: `verify:${g.key}`, phase: 'Verify', model: g.model || A.workerModel || 'sonnet', effort: g.effort || E.work, schema: withUsed(CLAIMS) })
+  agent(`${BASE}\n\nGroup "${g.key}":\n${g.prompt}${inventory ? `\nYour claims (return a verdict for every id, keeping the id exactly; add any others you find in your topic with new ids):\n${JSON.stringify(assigned(g.key))}` : ''}`, { label: `verify:${g.key}`, phase: 'Verify', model: workerFor(g), effort: g.effort || E.work, schema: withUsed(CLAIMS) })
     .then(r => r && { ...r, group: g.key, claims: (r.claims || []).map(c => ({ ...c, id: `${g.key}:${c.id}` }))
       // No quote, no "confirmed".
       .map(c => c.verdict === 'confirmed' && !(c.citations || []).length ? { ...c, verdict: 'unverifiable', demoted_from: 'confirmed' } : c) })
@@ -186,7 +191,7 @@ let quotes = null
 if (A.quoteCheck !== false) {
   phase('Quotes'); mark('Quotes')
   quotes = await agent(`${BASE}\n\n${QUOTE_TASK}\n\nREFS:\n${JSON.stringify(quoteRefs(claims))}`,
-    { label: 'quote-check', phase: 'Quotes', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(QC) })
+    { label: 'quote-check', phase: 'Quotes', model: MECH, effort: 'low', schema: withUsed(QC) })
   if (!quotes) { not_run.push('quote-check') }
 }
 const badQuote = quoteStatus(quotes)
@@ -256,7 +261,7 @@ if (A.recheck) {
   phase('Recheck'); mark('Recheck')
   const items = [...(logic ? logic.claims_safe_for_pr : []), ...[logic, ...attacked].filter(Boolean).flatMap(a => (a.objections || (a.conclusions || []).flatMap(c => c.objections)).filter(o => ['blocker', 'serious'].includes(o.severity)))]
   recheck = await agent(`${BASE}\n\n${RECHECK_TASK}\n\nITEMS:\n${JSON.stringify(items)}`,
-    { label: 'recheck', phase: 'Recheck', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(RECHECK) })
+    { label: 'recheck', phase: 'Recheck', model: MECH, effort: 'low', schema: withUsed(RECHECK) })
   if (!recheck) { not_run.push('recheck') }
 }
 mark('end')

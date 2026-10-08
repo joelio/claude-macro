@@ -6,7 +6,7 @@ export const meta = {
     { title: 'Check', detail: 'correctness, build, size, platform checks in parallel', model: 'sonnet' },
     { title: 'Benchmark', detail: 'runs alone so timings are clean', model: 'sonnet' },
     { title: 'Challenge', detail: 'adversarial review, safe claims, verification steps', model: 'opus' },
-    { title: 'Recheck', detail: 'optional: re-open the challenger\'s citations', model: 'sonnet' },
+    { title: 'Recheck', detail: 'optional: re-open the challenger\'s citations', model: 'haiku' },
   ],
 }
 
@@ -15,11 +15,11 @@ export const meta = {
 //   context: 'why, what is measured already, paths',
 //   workDir: '/abs/dir for scripts and raw data (outside any repo)',
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools, appended to the defaults',
-//   checks: [{ key, prompt, effort? }],               // effort defaults to the profile's worker effort; 'low' for mechanical checks
+//   checks: [{ key, prompt, model?, effort? }],               // effort defaults to the profile's worker effort; 'low' for mechanical checks
 //   benchmark?: { prompt, kind?, effort? },           // kind: 'process' (default) | 'browser' | 'device' | 'gpu'; omit when timing is not the question
 //   qaAudience?: 'who verifies and with what',        // default: the developer, locally
 //   recheck?: false,                               // mechanical re-check of the challenger's objections and safe claims
-//   workerModel?: 'sonnet', reviewModel?: 'opus', reviewEffort?: 'high'
+//   workerModel?: 'sonnet', mechanicalModel?: 'haiku', reviewModel?: 'opus', reviewEffort?: 'high'   // mechanicalModel: recheck, effort-'low' checks
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
 const A = args || {}
@@ -122,6 +122,11 @@ const RECHECK = { type: 'object', properties: { items: { type: 'array', items: {
   item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
   evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
 const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
+// Models. Mechanical passes (the quote check, recheck, and any stream, group, check or option given effort 'low'
+// without a model) run on Haiku; evidence work on Sonnet; the adversary on Opus. args.mechanicalModel and
+// args.workerModel override the first two; a model set on a single task wins.
+const MECH = A.mechanicalModel || 'haiku'
+const workerFor = t => t.model || (t.effort === 'low' ? MECH : A.workerModel || 'sonnet')
 // --- end shared ---
 
 uniqueKeys(A.checks, 'check')
@@ -149,7 +154,7 @@ const RESULT = { type: 'object', properties: {
 phase('Check'); mark('Check')
 const checks = (await parallel(A.checks.map(c => () =>
   agent(`${BASE}\n\nTask "${c.key}":\n${c.prompt}\nReport what you found and rate each result's bearing on the change honestly; leave the verdict on the change to the reviewer.`,
-    { label: `check:${c.key}`, phase: 'Check', model: A.workerModel || 'sonnet', effort: c.effort || E.work, schema: withUsed(RESULT) })
+    { label: `check:${c.key}`, phase: 'Check', model: workerFor(c), effort: c.effort || E.work, schema: withUsed(RESULT) })
     .then(r => r && { ...r, task: c.key, results: (r.results || []).map((x, j) => ({ ...x, id: `${c.key}#${j}` })) })
 ))).filter(Boolean)
 
@@ -193,7 +198,7 @@ if (A.recheck && challenge) {
   phase('Recheck'); mark('Recheck')
   const items = [...challenge.claims_safe_for_pr, ...challenge.objections.filter(o => ['blocker', 'serious'].includes(o.severity))]
   recheck = await agent(`${BASE}\n\n${RECHECK_TASK}\n\nITEMS:\n${JSON.stringify(items)}\n\nEVIDENCE:\n${JSON.stringify(all)}`,
-    { label: 'recheck', phase: 'Recheck', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(RECHECK) })
+    { label: 'recheck', phase: 'Recheck', model: MECH, effort: 'low', schema: withUsed(RECHECK) })
   if (!recheck) { not_run.push('recheck') }
 }
 mark('end')

@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'Start of an investigation: turn a ticket or question into measured, sourced and code-read evidence',
   phases: [
     { title: 'Measure', detail: 'one agent per evidence stream', model: 'sonnet' },
-    { title: 'Quotes', detail: 'mechanical check that every quote is in its source', model: 'sonnet' },
+    { title: 'Quotes', detail: 'mechanical check that every quote is in its source', model: 'haiku' },
     { title: 'Challenge', detail: 'sceptic re-checks, finds gaps and alternative explanations', model: 'opus' },
   ],
 }
@@ -16,7 +16,7 @@ export const meta = {
 //   rules?: 'extra safety rules', tools?: 'extra notes on sources or tools, appended to the defaults',
 //   streams: [{ key, prompt, model?, effort? }],   // 4-6 streams, each a different way of knowing; effort 'low' for mechanical ones
 //   quoteCheck?: true,                             // mechanical quote check before the sceptic; false to skip
-//   workerModel?: 'sonnet',
+//   workerModel?: 'sonnet', mechanicalModel?: 'haiku',   // mechanicalModel: quote check and effort-'low' streams
 //   sceptic?: { model?, effort?, minClaims? }      // defaults 'opus', 'high', 12
 //   profile?: 'standard'                       // quick | standard | deep | max: default effort for the whole run
 // }
@@ -120,6 +120,11 @@ const RECHECK = { type: 'object', properties: { items: { type: 'array', items: {
   item: { type: 'string' }, status: { type: 'string', enum: ['holds', 'contradicted', 'unsupported'] },
   evidence: { type: 'string' } }, required: ['item', 'status', 'evidence'] } } }, required: ['items'] }
 const RECHECK_TASK = 'Task "recheck", mechanical; add no opinions. For each item, re-open its citations and any raw data it names, and say holds, contradicted (quote what contradicts it) or unsupported. A contradicted item is for the human to decide, not an automatic reversal.'
+// Models. Mechanical passes (the quote check, recheck, and any stream, group, check or option given effort 'low'
+// without a model) run on Haiku; evidence work on Sonnet; the adversary on Opus. args.mechanicalModel and
+// args.workerModel override the first two; a model set on a single task wins.
+const MECH = A.mechanicalModel || 'haiku'
+const workerFor = t => t.model || (t.effort === 'low' ? MECH : A.workerModel || 'sonnet')
 // --- end shared ---
 
 uniqueKeys(A.streams, 'stream')
@@ -145,7 +150,7 @@ const FINDINGS = { type: 'object', properties: {
 phase('Measure'); mark('Measure')
 const got = (await parallel(A.streams.map(s => () =>
   agent(`${BASE}\n\nYour stream "${s.key}":\n${s.prompt}`, {
-    label: `measure:${s.key}`, phase: 'Measure', model: s.model || A.workerModel || 'sonnet', effort: s.effort || E.work, schema: withUsed(FINDINGS),
+    label: `measure:${s.key}`, phase: 'Measure', model: workerFor(s), effort: s.effort || E.work, schema: withUsed(FINDINGS),
   }).then(r => r && { ...r, stream: s.key, findings: (r.findings || []).map((f, j) => ({ ...f, id: `${s.key}#${j}` })) })
 ))).filter(Boolean)
 // Agents that failed or were skipped are reported, never silently dropped.
@@ -157,7 +162,7 @@ let quotes = null
 if (A.quoteCheck !== false) {
   phase('Quotes'); mark('Quotes')
   quotes = await agent(`${BASE}\n\n${QUOTE_TASK}\n\nREFS:\n${JSON.stringify(quoteRefs(all))}`,
-    { label: 'quote-check', phase: 'Quotes', model: A.workerModel || 'sonnet', effort: 'low', schema: withUsed(QC) })
+    { label: 'quote-check', phase: 'Quotes', model: MECH, effort: 'low', schema: withUsed(QC) })
   if (!quotes) { not_run.push('quote-check') }
 }
 const badQuote = quoteStatus(quotes)

@@ -38,7 +38,7 @@ Chains are normal: investigate, then decide or debug, then change-evidence for t
 2. Pick a run folder: `mkdir -p ~/.local/share/macro/<project>/<YYYY-MM-DD>-<slug>/` (today's date from the shell). It is the `workDir`. Save the args there as `args.json`.
 3. Write `args` from the closest file in `<repo>/examples/` or `<repo>/packs/*/examples/`. Replace every `<PLACEHOLDER>`; estate details (paths, hosts, asset names, tables) go in args, never in a script. Put what earlier runs learned into `tools`: the relevant trap bullets from `LESSONS.md` (and the pack's), and this project's lines from `~/.local/share/macro/INDEX.md`. Add stack hints there too (e.g. `CARGO_TARGET_DIR`, `. $IDF_PATH/export.sh`, `uv venv`).
 4. Tier the cost:
-   - Give mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes) `"effort": "low"`.
+   - Give mechanical streams, checks or groups (counts, file:line re-checks, builds, byte sizes) `"effort": "low"`; they run on Haiku, as do the quote check and recheck. Add `"model": "sonnet"` to a low-effort task that needs judgement (browser request counting, timings with statistics, security inventories).
    - The default is Sonnet at `medium` and the adversary Opus at `high`.
    - For a hard or high-stakes question, suggest `"profile": "deep"` or `"max"` and say that it costs more; use `"quick"` for smoke tests.
    - Scale the number of agents to the question, following Anthropic's multi-agent research guidance (docs/research/2026-10-01-harness-engineering.md):
